@@ -17,7 +17,7 @@ from utils.solver import to_solver, solver
 from utils.graph import convert_to_nx
 
 
-def _collectEval(info, solver_dir, save_dir, exp_name):
+def _collectEval(info, solver_dir, save_dir, exp_name=0):
     random.seed(42)
 
     assign_idx, assign_pos = info['lns']

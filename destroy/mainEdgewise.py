@@ -329,7 +329,7 @@ def multiEval(evalMode='greedy', candSize=10, device='cuda:3', returnDict=dict, 
     return nlns
 
 
-def heuristicEval(evalID=0, threshold=10):
+def heuristicEval(evalID=0, threshold=10, exp_name='temp'):
     random.seed(42)
 
     " EECBS solver directory setup "
@@ -347,17 +347,16 @@ def heuristicEval(evalID=0, threshold=10):
         info, _, _ = pickle.load(f)
 
     " Adapt model into LNS procedure (Actual Evaluation) "
-    task_idx, assign = info['lns']
+    assign_idx, assign_pos = info['lns']
     pre_cost = info['init_cost']
     results = [pre_cost]
     time_log = None
 
     algo_start_time = time.time()
-
     for itr in range(100_000_000):
-        temp_assign = copy.deepcopy(assign)
+        temp_assign_idx = copy.deepcopy(assign_idx)
         removal_idx = removal(
-            task_idx,
+            assign_idx,
             info['tasks'],
             info['graph'],
             N=2,
@@ -365,27 +364,51 @@ def heuristicEval(evalID=0, threshold=10):
         )
         if removal_idx == 'stop':
             return 'stop'
-        for i, t in enumerate(temp_assign.values()):
-            for r in removal_idx:
-                if {r: info['tasks'][r]} in t:
-                    temp_assign[i].remove({r: info['tasks'][r]})
+
+        # remove 'removal_idx'
+        removed = [False for _ in removal_idx]
+        for schedule in temp_assign_idx:
+            for i, r in enumerate(removal_idx):
+                if removed[i]: continue
+                if r in schedule:
+                    schedule.remove(r)
+                    removed[i] = True
 
         while len(removal_idx) != 0:
-            f_val = f_ijk(temp_assign, info['agents'], removal_idx, info['tasks'], info['graph'])
-            regret = get_regret(f_val)
-            regret = dict(sorted(regret.items(), key=lambda x: x[1][0], reverse=True))
-            re_ins = list(regret.keys())[0]
-            re_a, re_j = regret[re_ins][1], regret[re_ins][2]
+            f_val = f_ijk(temp_assign_idx, info['agents'], removal_idx, info['tasks'], info['graph'])
+
+            # get min regret
+            regrets = np.stack(list(f_val.values()))
+            argmin_regret = np.argmin(regrets, axis=None)
+            min_regret_idx = np.unravel_index(argmin_regret, regrets.shape)
+
+            r_idx, insertion_edge_idx = min_regret_idx
+            re_ins = removal_idx[r_idx]
+
+            # get insertion agent index and location
+            ag_idx = 0
+            while True:
+                ag_schedule = assign_idx[ag_idx]
+                if insertion_edge_idx - (len(ag_schedule) + 1) < 0:
+                    ins_pos = insertion_edge_idx
+                    break
+                else:
+                    insertion_edge_idx -= (len(ag_schedule) + 1)
+                    ag_idx += 1
+
+            temp_assign_idx[ag_idx].insert(ins_pos, re_ins)
             removal_idx.remove(re_ins)
-            to_insert = {re_ins: info['tasks'][re_ins]}
-            temp_assign[re_a].insert(re_j, to_insert)
+
+            assign_pos = [np.array(info['tasks'])[schedule].tolist() for schedule in temp_assign_idx]
 
         cost, _, time_log = solver(
             info['grid'],
             info['agents'],
-            to_solver(info['tasks'], temp_assign),
+            assign_pos,
             ret_log=True,
-            dir=h_dir
+            solver_dir=solver_dir,
+            save_dir=save_dir,
+            exp_name=exp_name
         )
 
         if cost == 'error':
@@ -395,18 +418,12 @@ def heuristicEval(evalID=0, threshold=10):
             if algo_current_time - algo_start_time <= threshold:
                 if cost < pre_cost:
                     pre_cost = cost
-                    assign = temp_assign
+                    assign_idx = temp_assign_idx
                     results.append(pre_cost)
                 elif cost >= pre_cost:
                     results.append(pre_cost)
             else:
                 break
-
-    try:
-        if os.path.exists(h_dir[1]):
-            shutil.rmtree(h_dir[1])
-    except OSError:
-        print("Error: Cannot remove the directory.")
 
     return (results[0] - results[-1]) / results[0] * 100
 
