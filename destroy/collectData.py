@@ -132,10 +132,10 @@ if __name__ == "__main__":
 
     N, M = 5, 50
     n_process = 10
-    n_data = 10
-    solver_dir = os.path.join(Path(os.path.realpath(__file__)).parent.parent, 'EECBS/eecbs')
-    temp_LNS_dir = os.path.join(Path(os.path.realpath(__file__)).parent.parent, 'EECBS/LNS')
-    temp_init_dir = os.path.join(Path(os.path.realpath(__file__)).parent.parent, 'EECBS/init')
+    n_data = 1000
+    solver_dir = os.path.join(Path(os.path.realpath(__file__)).parent.parent, 'PBS/pbs')
+    temp_LNS_dir = os.path.join(Path(os.path.realpath(__file__)).parent.parent, 'PBS/LNS')
+    temp_init_dir = os.path.join(Path(os.path.realpath(__file__)).parent.parent, 'PBS/init')
 
     # make directory per process
     for p in range(n_process):
