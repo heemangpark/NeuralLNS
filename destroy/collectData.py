@@ -72,25 +72,26 @@ def _collectEval(info, solver_dir, save_dir, exp_name):
             removal_idx.remove(re_ins)
 
             assign_pos = [np.array(info['tasks'])[schedule].tolist() for schedule in temp_assign_idx]
-            cost, _, time_log = solver(
-                info['grid'],
-                info['agents'],
-                assign_pos,
-                ret_log=True,
-                solver_dir=solver_dir,
-                save_dir=save_dir,
-                exp_name=exp_name
-            )
 
-            if cost == 'error':
-                pass
-            else:
-                if cost < pre_cost:
-                    pre_cost = cost
-                    assign_idx = temp_assign_idx
-                    results.append(pre_cost)
-                elif cost >= pre_cost:
-                    results.append(pre_cost)
+        cost, _, time_log = solver(
+            info['grid'],
+            info['agents'],
+            assign_pos,
+            ret_log=True,
+            solver_dir=solver_dir,
+            save_dir=save_dir,
+            exp_name=exp_name
+        )
+
+        if cost == 'error':
+            pass
+        else:
+            if cost < pre_cost:
+                pre_cost = cost
+                assign_idx = temp_assign_idx
+                results.append(pre_cost)
+            elif cost >= pre_cost:
+                results.append(pre_cost)
 
     return (results[0] - results[-1]) / results[0] * 100
 
