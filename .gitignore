@@ -1,0 +1,25 @@
+__pycache__/
+.git/
+.idea/
+.ipynb_checkpoints/
+wandb/
+
+# datasets
+dataset/
+scenarios/
+
+# MAPF solvers
+EECBS/
+
+# temp dirs
+platform/
+prev/
+
+*.ipynb
+*.png
+*.txt
+*.th
+*.csv
+*.xlsx
+*.pkl
+*.pt
