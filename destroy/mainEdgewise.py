@@ -93,7 +93,7 @@ def train(epochs=100, dataSize=10000, batchNum=100, method='topK', device='cuda:
         #         wandb.log({'eval_NLNS': evalNLNS, 'eval_LNS': evalLNS})
 
 
-def eval(dir=None, evalNum=10, dataDist='out', evalMode='greedy', candSize=10, device='cuda:1'):
+def eval(dir=None, evalNum=10, dataDist='out', evalMode='greedy', candSize=10, device='cuda:1', exp_name='eval'):
     """
     @param dir: directory of the model to evaluate
     @param evalNum: number of maps to evaluate
@@ -117,8 +117,8 @@ def eval(dir=None, evalNum=10, dataDist='out', evalMode='greedy', candSize=10, d
     random.shuffle(mapIndex)
     for mapVersion in mapIndex[:evalNum]:
         " EECBS solver directory setup "
-        solver_dir = os.path.join(Path(os.path.realpath(__file__)).parent.parent, 'EECBS/eecbs')
-        save_dir = os.path.join(Path(os.path.realpath(__file__)).parent.parent, 'EECBS/{}/'.
+        solver_dir = os.path.join(Path(os.path.realpath(__file__)).parent.parent, 'PBS/pbs')
+        save_dir = os.path.join(Path(os.path.realpath(__file__)).parent.parent, 'PBS/{}/'.
                                 format(datetime.now().strftime("%m%d_%H%M%S")))
         n_dir = [solver_dir, save_dir, 'nlns', mapVersion]
 
@@ -139,42 +139,65 @@ def eval(dir=None, evalNum=10, dataDist='out', evalMode='greedy', candSize=10, d
             raise NotImplementedError('test data distribution -> in or out')
 
         " Adapt model into LNS procedure (Actual Evaluation) "
-        task_idx, assign = copy.deepcopy(info['lns'])
+        assign_idx, assign_pos = info['lns']
         pre_cost = info['init_cost']
         results = [pre_cost]
 
         for itr in range(100):
-            temp_assign = copy.deepcopy(assign)
+            temp_assign_idx = copy.deepcopy(assign_idx)
             temp_graph = copy.deepcopy(graph)
-
             num_tasks = len([i for i in temp_graph.nodes() if temp_graph.ndata['type'][i] == 2])
-
             destroyCand = [c for c in combinations(range(num_tasks), 3)]
             candDestroy = random.sample(destroyCand, candSize)
             removal_idx = model.act(temp_graph, candDestroy, evalMode, device)
-            removal_idx = list(removal_idx)
+            if removal_idx == 'stop':
+                return 'stop'
 
-            for i, t in enumerate(temp_assign.values()):
-                for r in removal_idx:
-                    if {r: info['tasks'][r]} in t:
-                        temp_assign[i].remove({r: info['tasks'][r]})
+            # remove 'removal_idx'
+            removed = [False for _ in removal_idx]
+            for schedule in temp_assign_idx:
+                for i, r in enumerate(removal_idx):
+                    if removed[i]: continue
+                    if r in schedule:
+                        schedule.remove(r)
+                        removed[i] = True
 
             while len(removal_idx) != 0:
-                f_val = f_ijk(temp_assign, info['agents'], removal_idx, info['tasks'], info['graph'])
-                regret = get_regret(f_val)
-                regret = dict(sorted(regret.items(), key=lambda x: x[1][0], reverse=True))
-                re_ins = list(regret.keys())[0]
-                re_a, re_j = regret[re_ins][1], regret[re_ins][2]
+                f_val = f_ijk(temp_assign_idx, info['agents'], removal_idx, info['tasks'], info['graph'])
+
+                # get min regret
+                regrets = np.stack(list(f_val.values()))
+                argmin_regret = np.argmin(regrets, axis=None)
+                min_regret_idx = np.unravel_index(argmin_regret, regrets.shape)
+
+                r_idx, insertion_edge_idx = min_regret_idx
+                re_ins = removal_idx[r_idx]
+
+                # get insertion agent index and location
+                ag_idx = 0
+                ins_pos = 0
+                while True:
+                    ag_schedule = assign_idx[ag_idx]
+                    if insertion_edge_idx - (len(ag_schedule) + 1) < 0:
+                        ins_pos = insertion_edge_idx
+                        break
+                    else:
+                        insertion_edge_idx -= (len(ag_schedule) + 1)
+                        ag_idx += 1
+
+                temp_assign_idx[ag_idx].insert(ins_pos, re_ins)
                 removal_idx.remove(re_ins)
-                to_insert = {re_ins: info['tasks'][re_ins]}
-                temp_assign[re_a].insert(re_j, to_insert)
+
+                assign_pos = [np.array(info['tasks'])[schedule].tolist() for schedule in temp_assign_idx]
 
             cost, _, time_log = solver(
                 info['grid'],
                 info['agents'],
-                to_solver(info['tasks'], temp_assign),
+                assign_pos,
                 ret_log=True,
-                dir=n_dir
+                solver_dir=solver_dir,
+                save_dir=save_dir,
+                exp_name=exp_name
             )
 
             if cost == 'error':
@@ -183,14 +206,11 @@ def eval(dir=None, evalNum=10, dataDist='out', evalMode='greedy', candSize=10, d
             else:
                 if cost < pre_cost:
                     pre_cost = cost
-                    assign = temp_assign
+                    assign_idx = temp_assign_idx
                     results.append(pre_cost)
-                    coordination = [[a] for a in info['agents'].tolist()]
-                    for i, coords in enumerate(assign.values()):
-                        temp_schedule = [list(c.values())[0][0] for c in coords]
-                        coordination[i].extend(temp_schedule)
-                    task_idx = assignment_to_id(len(info['agents']), assign)
-                    next_nx_graph = convert_to_nx(task_idx, coordination, info['grid'].shape[0])
+
+                    coordination = [[a.tolist()] + t for a, t in zip(info['agents'], assign_pos)]
+                    next_nx_graph = convert_to_nx(assign_idx, coordination, info['grid'].shape[0])
                     next_graph = dgl.from_networkx(
                         next_nx_graph,
                         node_attrs=['coord', 'type', 'idx', 'graph_id'],
@@ -228,12 +248,12 @@ def multiEval(evalMode='greedy', candSize=10, device='cuda:3', returnDict=dict, 
 
     " Load model "
     model = DestroyEdgewise(device=device)
-    model.load_state_dict(torch.load('models/0510_192046/destroyEdgewise_topK_100.pt'))
+    # model.load_state_dict(torch.load('models/0510_192046/destroyEdgewise_topK_100.pt'))
     model.eval()
 
     " EECBS solver directory setup "
-    solver_dir = os.path.join(Path(os.path.realpath(__file__)).parent.parent, 'EECBS/eecbs')
-    save_dir = os.path.join(Path(os.path.realpath(__file__)).parent.parent, 'EECBS/{}/'.format(evalID))
+    solver_dir = os.path.join(Path(os.path.realpath(__file__)).parent.parent, 'PBS/pbs')
+    save_dir = os.path.join(Path(os.path.realpath(__file__)).parent.parent, 'PBS/{}/'.format(evalID))
     n_dir = [solver_dir, save_dir, 'nlns', evalID]
 
     try:
@@ -243,9 +263,15 @@ def multiEval(evalMode='greedy', candSize=10, device='cuda:3', returnDict=dict, 
         print("Error: Cannot create the directory.")
 
     " Load initial solution "
-    with open('evalData/550/evalData_{}.pkl'.format(evalID), 'rb') as f:
+    with open('../evalData/550/evalData_{}.pkl'.format(evalID), 'rb') as f:
         info, graph, _ = pickle.load(f)
-        graph = graph.to(device)
+
+    graph = dgl.from_networkx(
+        graph,
+        node_attrs=['coord', 'type', 'idx', 'graph_id'],
+        edge_attrs=['dist', 'connected']
+    ).to(device)
+    graph.edata['dist'] = graph.edata['dist'].to(torch.float32)
 
     " Adapt model into LNS procedure (Actual Evaluation) "
     assign_idx, assign_pos = info['lns']
@@ -356,9 +382,9 @@ def multiEval(evalMode='greedy', candSize=10, device='cuda:3', returnDict=dict, 
 def heuristicEval(evalID=0, threshold=10, exp_name='temp'):
     random.seed(42)
 
-    " EECBS solver directory setup "
-    solver_dir = os.path.join(Path(os.path.realpath(__file__)).parent.parent, 'EECBS/eecbs')
-    save_dir = os.path.join(Path(os.path.realpath(__file__)).parent.parent, 'EECBS/{}/'.format(evalID))
+    " PBS solver directory setup "
+    solver_dir = os.path.join(Path(os.path.realpath(__file__)).parent.parent, 'PBS/pbs')
+    save_dir = os.path.join(Path(os.path.realpath(__file__)).parent.parent, 'PBS/{}/'.format(evalID))
     h_dir = [solver_dir, save_dir, 'lns', evalID]
     try:
         if not os.path.exists(h_dir[1]):

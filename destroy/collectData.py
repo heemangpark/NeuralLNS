@@ -108,7 +108,6 @@ def run(run_info, N, M):
     info = {'grid': scenario[0], 'graph': scenario[1], 'agents': scenario[2], 'tasks': [t[0] for t in scenario[3]]}
 
     assign_id, assign_pos = hungarian(info['graph'], info['agents'], info['tasks'])
-    # assign_id, assign = hungarian_prev(info['graph'], info['agents'], scenario[3])
     info['lns'] = assign_id, assign_pos
 
     coordination = [[a.tolist()] + t for a, t in zip(info['agents'], assign_pos)]
