@@ -138,12 +138,14 @@ if __name__ == "__main__":
     temp_LNS_dir = os.path.join(Path(os.path.realpath(__file__)).parent.parent, 'PBS/LNS')
     temp_init_dir = os.path.join(Path(os.path.realpath(__file__)).parent.parent, 'PBS/init')
 
-    # make directory per process
+    # delete existing directory
     for p in range(n_process):
-        if not os.path.exists(temp_LNS_dir + str(p) + '/'):
-            os.makedirs(temp_LNS_dir + str(p) + '/')
-        if not os.path.exists(temp_init_dir + str(p) + '/'):
-            os.makedirs(temp_init_dir + str(p) + '/')
+        if os.path.exists(temp_LNS_dir + str(p) + '/'):
+            shutil.rmtree(temp_LNS_dir + str(p) + '/')
+        os.makedirs(temp_LNS_dir + str(p) + '/')
+        if os.path.exists(temp_init_dir + str(p) + '/'):
+            shutil.rmtree(temp_init_dir + str(p) + '/')
+        os.makedirs(temp_init_dir + str(p) + '/')
 
     if not os.path.exists('evalData/{}{}/'.format(N, M)):
         os.makedirs('evalData/{}{}/'.format(N, M))
@@ -158,7 +160,6 @@ if __name__ == "__main__":
             run_info['init_save_dir'] = temp_init_dir + str(p) + '/'
 
             run_infos.append(run_info)
-            # run(run_info, N, M)
 
         run_list = [Process(target=run, args=(_info, N, M)) for _info in run_infos]
 

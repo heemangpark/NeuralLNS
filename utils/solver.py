@@ -102,7 +102,7 @@ def solver(instance, agents, tasks, solver_dir, save_dir, exp_name, ret_log=Fals
              save_dir + exp_name + "_paths_{}.txt".format(itr),
              "-k", "{}".format(len(s_agents)),
              "-t", "{}".format(1),
-             "--suboptimality={}".format(1.2)]
+             ]
         process_out = subprocess.run(c, capture_output=True)
         text_byte = process_out.stdout.decode('utf-8')
         if (text_byte[37:44] != 'Succeed') & ret_log:
