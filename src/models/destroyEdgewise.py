@@ -6,7 +6,7 @@ from lion_pytorch import Lion
 from torch import nn as nn
 from torch.distributions.categorical import Categorical as C
 
-from models.gnn import GNNEdgewise, GNNLayerEdgewise
+from src.models.gnn import GNNEdgewise, GNNLayerEdgewise
 
 
 def destroyGraph(graph, destroy, device):

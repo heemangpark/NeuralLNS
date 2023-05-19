@@ -1,0 +1,7 @@
+batch_num: 100
+data_size: 100000
+device: cuda:1
+epochs: 100
+method: topK
+seed: 3298
+wandb: True

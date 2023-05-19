@@ -5,7 +5,7 @@ import networkx as nx
 import torch
 from torch import nn as nn
 
-from models.gnn import GNN, GNNLayerEdgewise
+from src.models.gnn import GNN, GNNLayerEdgewise
 
 
 def tempDestroy(assign, graph, removal):

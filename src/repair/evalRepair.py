@@ -15,7 +15,7 @@ from src.heuristics.hungarian import hungarian
 from src.heuristics.regret import f_ijk, get_regret
 from src.heuristics.shaw import removal
 from utils.graph import convert_to_nx
-from models.repair import NeuroRepair
+from src.models.repair import NeuroRepair
 from utils.scenario import load_scenarios
 from utils.solver import to_solver, solver
 from utils.solver import assignment_to_id

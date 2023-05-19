@@ -21,7 +21,7 @@ from utils.graph import convert_to_nx
 from utils.solver import solver, assignment_to_id, to_solver
 
 
-def train(epochs=100, dataSize=10000, batchNum=100, method='topK', device='cuda:1', wandb=False, midEval=False):
+def train(epochs=100, dataSize=10000, batchNum=100, method='topK', device='cuda:1', wandb=False):
     """
     @param epochs: exp epochs
     @param dataSize: exp file number
@@ -29,20 +29,23 @@ def train(epochs=100, dataSize=10000, batchNum=100, method='topK', device='cuda:
     @param method: label filtering method
     @param device: model device
     @param wandb: plot wandb or not
-    @param midEval: conduct mid-evaluation or not
     @return: saved model pt
     """
     date = datetime.now().strftime("%m%d_%H%M%S")
 
     if wandb:
         import wandb
-        wandb.init(project='NLNS-destroy', name=date, config={'score distribution': False,
-                                                              'normalized distribution': False,
-                                                              'method': method,
-                                                              'loss type': 'REINFORCE'})
+        wandb.init(
+            project='NLNS-destroy',
+            name=date,
+            config={'score distribution': False,
+                    'normalized distribution': False,
+                    'method': method,
+                    'loss type': 'REINFORCE'}
+        )
 
     model = DestroyEdgewise(device=device)
-    model.load_state_dict(torch.load('models/0510_192046/destroyEdgewise_topK_60.pt'))
+    model.load_state_dict(torch.load('data/trained/XXXX_XXXXXX/XX.pt'))
     batchSize = dataSize // batchNum
     data_idx = list(range(dataSize))
 
@@ -79,18 +82,6 @@ def train(epochs=100, dataSize=10000, batchNum=100, method='topK', device='cuda:
             if not os.path.exists(dir):
                 os.makedirs(dir)
             torch.save(model.state_dict(), dir + 'destroyEdgewise_{}_{}.pt'.format(method, e + 1))
-
-        # if midEval & ((e + 1) % 10 == 0):
-        #     evalNLNS, evalLNS = eval(
-        #         dir='',
-        #         evalNum=10,
-        #         evalMode='greedy',
-        #         dataDist='out',
-        #         candSize=10,
-        #         device=device
-        #     )
-        #     if wandb:
-        #         wandb.log({'eval_NLNS': evalNLNS, 'eval_LNS': evalLNS})
 
 
 def eval(dir=None, evalNum=10, dataDist='out', evalMode='greedy', candSize=10, device='cuda:1'):
@@ -411,11 +402,20 @@ def heuristicEval(evalID=0, threshold=10):
     return (results[0] - results[-1]) / results[0] * 100
 
 
+def run(mode):
+    if mode == 'train':
+        train(epochs=100, dataSize=10000, batchNum=100, method='topK', device='cuda:3', wandb=True)
+    elif mode == 'eval':
+        eval(dir=None, evalNum=10, dataDist='out', evalMode='greedy', candSize=10, device='cuda:1')
+    else:
+        raise NotImplementedError('RUN MODE ONLY SUPPORTS || train eval')
+
+
 if __name__ == '__main__':
     train_ = False
 
     if train_:
-        train(epochs=100, dataSize=10000, batchNum=100, method='topK', device='cuda:3', wandb=True, midEval=False)
+        train(epochs=100, dataSize=10000, batchNum=100, method='topK', device='cuda:3', wandb=True)
 
     else:
         import numpy as np

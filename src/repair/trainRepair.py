@@ -9,7 +9,7 @@ import wandb as w
 from tqdm import trange
 
 sys.path.append(os.path.dirname(os.path.abspath(os.path.dirname(__file__))))
-from models.repair import NeuroRepair
+from src.models.repair import NeuroRepair
 
 wandb = False
 if wandb:

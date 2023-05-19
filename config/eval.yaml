@@ -1,0 +1,6 @@
+cand_size: 10
+device: cuda:1
+dir: ../data/trained/XXXX.pt
+eval_num: 100
+seed: 3298
+type: neural  # neural, heuristic
