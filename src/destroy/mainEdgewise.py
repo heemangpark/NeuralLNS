@@ -14,9 +14,9 @@ from tqdm import tqdm
 from tqdm import trange
 
 sys.path.append(os.path.dirname(os.path.abspath(os.path.dirname(__file__))))
-from heuristics.shaw import removal
-from heuristics.regret import f_ijk, get_regret
-from nn.destroyEdgewise import DestroyEdgewise
+from src.heuristics.shaw import removal
+from src.heuristics.regret import f_ijk, get_regret
+from models.destroyEdgewise import DestroyEdgewise
 from utils.graph import convert_to_nx
 from utils.solver import solver, assignment_to_id, to_solver
 

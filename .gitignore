@@ -5,16 +5,15 @@ __pycache__/
 wandb/
 
 # datasets
-dataset/
+data/
 scenarios/
 
-# MAPF solvers
+# C++ solvers
 EECBS/
 PBS/
 
-# temp dirs
-platform/
-prev/
+# etc.
+archive/
 
 *.ipynb
 *.png
