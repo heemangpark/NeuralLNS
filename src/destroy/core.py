@@ -15,12 +15,13 @@ import yaml
 from tqdm import trange
 
 sys.path.append(os.path.dirname(os.path.abspath(os.path.dirname(__file__))))
-from src.models.destroyEdgewise import DestroyEdgewise
+from src.models.destroy_edgewise import DestroyEdgewise
 from src.heuristics.regret import f_ijk, get_regret
 from src.heuristics.shaw import removal
 from utils.graph import convert_to_nx
 from utils.seed import seed_everything
 from utils.solver import solver, assignment_to_id, to_solver
+from src.destroy.collect_data import collect_data
 
 
 def train(cfg: dict):
@@ -226,22 +227,8 @@ def run(mode):
         train(cfg)
     elif mode == 'eval':
         eval(cfg)
-    else:
-        raise NotImplementedError('RUN SUPPORTS train OR eval ONLY')
-
-    # for evalItr in range(10):
-    #     manager = multiprocessing.Manager()
-    #     output = manager.dict()
-    #     process = []
-    #
-    #     for mapID in mapIndex[evalItr * 10: evalItr * 10 + 10]:
-    #         p = Process(target=multiEval, args=(*['', '', '', ''] + [mapID],))
-    #         process.append(p)
-    #         p.start()
-    #
-    #     for proc in process:
-    #         proc.join()
-    #     nlnsList = list(output.values())
-    #     totalList.extend(nlnsList)
-    #
-    # print('NLNS: {:.4f}'.format(np.mean(totalList)))
+    elif mode == 'train_data':
+        collect_data(cfg)
+    elif mode == 'eval_data':
+        collect_data(cfg)
+        raise NotImplementedError('RUN SUPPORTS: train eval train_data eval_data')

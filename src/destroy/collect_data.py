@@ -1,7 +1,6 @@
 import copy
 import os
 import pickle
-import random
 import shutil
 import sys
 from pathlib import Path
@@ -15,10 +14,11 @@ from src.heuristics.shaw import removal
 from utils.scenario import load_scenarios
 from utils.solver import solver
 from utils.graph import convert_to_nx
+from utils.seed import seed_everything
 
 
-def _collect_data(info, solver_dir, save_dir, exp_name):
-    random.seed(42)
+def collect_data(info, solver_dir, save_dir, exp_name):
+    seed_everything(3298)
 
     assign_idx, assign_pos = info['lns']
     pre_cost = info['init_cost']
@@ -97,7 +97,7 @@ def _collect_data(info, solver_dir, save_dir, exp_name):
 
 
 def run(run_info, N, M):
-    random.seed(42)
+    seed_everything(3298)
 
     exp_num = run_info['exp_num']
     solver_dir = run_info['solver_dir']
@@ -119,7 +119,7 @@ def run(run_info, N, M):
         return 'abandon_seed'
 
     data = [info, initGraph]
-    lnsResult = _collect_data(info, solver_dir, LNS_save, 'lns')
+    lnsResult = collect_data(info, solver_dir, LNS_save, 'lns')
     print(lnsResult)
     data.append(lnsResult)
 

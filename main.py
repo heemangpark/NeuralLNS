@@ -3,7 +3,7 @@ import argparse
 from src.destroy.core import run
 
 parser = argparse.ArgumentParser(description='RUNNING MAIN CODE !')
-parser.add_argument('--mode', choices=['train', 'eval'], default='train')
+parser.add_argument('--mode', choices=['train', 'eval', 'train_data', 'eval_data'], default='train')
 args = parser.parse_args()
 
 if __name__ == '__main__':
