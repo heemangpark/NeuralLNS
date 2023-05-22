@@ -3,9 +3,9 @@ import os
 import pickle
 import random
 import shutil
-import sys
 from datetime import datetime
 from itertools import combinations
+from multiprocessing import Process
 from pathlib import Path
 
 import dgl
@@ -14,14 +14,13 @@ import torch
 import yaml
 from tqdm import trange
 
-sys.path.append(os.path.dirname(os.path.abspath(os.path.dirname(__file__))))
-from src.models.destroy_edgewise import DestroyEdgewise
+from src.destroy.collect_data import collect_data
 from src.heuristics.regret import f_ijk, get_regret
 from src.heuristics.shaw import removal
+from src.models.destroy_edgewise import DestroyEdgewise
 from utils.graph import convert_to_nx
 from utils.seed import seed_everything
 from utils.solver import solver, assignment_to_id, to_solver
-from src.destroy.collect_data import collect_data
 
 
 def train(cfg: dict):
@@ -32,25 +31,31 @@ def train(cfg: dict):
     method = cfg['method']
     seed = cfg['seed']
     wandb = cfg['wandb']
+    lr = float(cfg['model']['lr'])
+    aggr = cfg['model']['aggr']
 
     seed_everything(seed)
 
     date = datetime.now().strftime("%m%d_%H%M%S")
 
+    hyperparameter_defaults = dict(
+        batch_size=data_size // batch_num,
+        learning_rate=lr,
+        aggregator=aggr
+    )
+
+    config_dictionary = dict(
+        yaml='../config/train.yaml',
+        params=hyperparameter_defaults,
+    )
+
     if wandb:
         import wandb
-        wandb.init(
-            project='NLNS-destroy',
-            name=date,
-            config={
-                'method': method,
-                'loss type': 'REINFORCE'
-            }
-        )
+        wandb.init(project='NeuralLNS', name=date, config=config_dictionary)
 
-    model = DestroyEdgewise(device=device)
+    model = DestroyEdgewise(device=device, lr=lr, aggr=aggr)
 
-    batchSize = data_size // batch_num
+    batch_size = data_size // batch_num
     data_idx = list(range(data_size))
 
     for e in trange(epochs):
@@ -60,21 +65,21 @@ def train(cfg: dict):
         for b in range(batch_num):
             batch_graph, batch_destroy = [], []
 
-            for d_id in data_idx[b * batchSize: (b + 1) * batchSize]:
-                with open('train_data/dataDestroy_{}.pkl'.format(d_id), 'rb') as f:
+            for d_id in data_idx[b * batch_size: (b + 1) * batch_size]:
+                with open('data/train_data/train_data{}.pkl'.format(d_id), 'rb') as f:  # TODO
                     graph, destroy = pickle.load(f)
                     if method == 'topK':
                         destroy = dict(sorted(destroy.items(), key=lambda x: abs(x[1]), reverse=True)[:10])
                     elif method == 'randomK':
-                        randomKey = list(destroy.keys())
-                        random.shuffle(randomKey)
-                        randomKey = randomKey[:10]
-                        destroy = dict(zip(randomKey, [destroy[k] for k in randomKey]))
+                        random_key = list(destroy.keys())
+                        random.shuffle(random_key)
+                        random_key = random_key[:10]
+                        destroy = dict(zip(random_key, [destroy[k] for k in random_key]))
                     batch_graph.append(graph)
                     batch_destroy.append(destroy)
             batch_graph = dgl.batch(batch_graph).to(device)
 
-            batch_loss = model.learn(batch_graph, batch_destroy, batch_num, device=device)
+            batch_loss = model.learn(batch_graph, batch_destroy, batch_size, device=device, lr=lr)
             epoch_loss += batch_loss
         epoch_loss /= batch_num
 
@@ -120,7 +125,7 @@ def eval(cfg: dict):
             print("Error: Cannot create the directory.")
 
         " Load initial solution "
-        with open('data/eval_data/evalData_{}.pkl'.format(map_id), 'rb') as f:
+        with open('data/eval_data/eval_data{}.pkl'.format(map_id), 'rb') as f:
             info, graph, lns = pickle.load(f)
 
         " LNS procedure "
@@ -174,8 +179,10 @@ def eval(cfg: dict):
                 info['grid'],
                 info['agents'],
                 to_solver(info['tasks'], temp_assign),
-                ret_log=True,
-                dir=lns_dir
+                solver_dir=lns_dir[0],
+                save_dir=lns_dir[1],
+                exp_name=lns_dir[2],
+                ret_log=True
             )
 
             if cost == 'error':
@@ -221,14 +228,27 @@ def eval(cfg: dict):
 
 
 def run(mode):
-    with open('config/{}.yaml'.format(mode)) as f:
-        cfg = yaml.load(f, Loader=yaml.FullLoader)
     if mode == 'train':
+        with open('config/{}.yaml'.format(mode)) as f:
+            cfg = yaml.load(f, Loader=yaml.FullLoader)
         train(cfg)
+
     elif mode == 'eval':
+        with open('config/{}.yaml'.format(mode)) as f:
+            cfg = yaml.load(f, Loader=yaml.FullLoader)
         eval(cfg)
+
     elif mode == 'train_data':
-        collect_data(cfg)
+        with open('config/data/{}.yaml'.format(mode)) as f:
+            cfg = yaml.load(f, Loader=yaml.FullLoader)
+        run_list = [Process(target=collect_data, args=([cfg, i])) for i in range(cfg['n_processes'])]
+        for r in run_list:
+            r.start()
+
     elif mode == 'eval_data':
+        with open('config/data/{}.yaml'.format(mode)) as f:
+            cfg = yaml.load(f, Loader=yaml.FullLoader)
         collect_data(cfg)
+
+    else:
         raise NotImplementedError('RUN SUPPORTS: train eval train_data eval_data')

@@ -6,7 +6,10 @@ from lion_pytorch import Lion
 from torch import nn as nn
 from torch.distributions.categorical import Categorical as C
 
-from src.models.gnn import GNNEdgewise, GNNLayerEdgewise
+from src.models.MPGNN import MPGNN, FC_Edges
+
+
+# from torch_geometric.nn.models import MLP
 
 
 def destroyGraph(graph, destroy, device):
@@ -109,48 +112,58 @@ class MLP(nn.Module):
 
 
 class DestroyEdgewise(nn.Module):
-    def __init__(self, embedding_dim=64, gnn_layers=3, device=None):
+    def __init__(self, embedding_dim=64, gnn_layers=3, device=None, lr=1e-3, aggr: str = 'min'):
         super(DestroyEdgewise, self).__init__()
         self.embedding_dim = embedding_dim
         self.nodeLayer = nn.Linear(2, embedding_dim)
-        self.edgeLayer = GNNLayerEdgewise(embedding_dim * 2, embedding_dim)
+        self.edgeLayer = FC_Edges(embedding_dim * 2, embedding_dim)
 
-        self.gnn = GNNEdgewise(
+        self.gnn = MPGNN(
             in_dim=embedding_dim,
             out_dim=embedding_dim,
             embedding_dim=embedding_dim,
             n_layers=gnn_layers,
+            aggr=aggr,
             residual=True,
         )
 
         self.mlp = MLP()
-        self.optimizer = Lion(self.parameters(), lr=1e-4)
-        self.loss = nn.KLDivLoss(reduction='batchmean')
+
+        # self.mlp = MLP(in_channels=64,
+        #                hidden_channels=94,
+        #                out_channels=1,
+        #                num_layers=3)
+
+        self.optimizer = Lion(self.parameters(),
+                              lr=lr,
+                              weight_decay=1e-4,
+                              use_triton=True)
+        # self.loss = nn.KLDivLoss(reduction='batchmean')
         self.to(device)
 
-    def learn(self, graphs: dgl.DGLHeteroGraph, destroys: list, batchNum: int, device: str):
+    def learn(self, graphs: dgl.DGLHeteroGraph, destroys: list, batch_num: int, device: str):
         """
         @param graphs: original graph (without destroy yet)
         @param destroys: destroyed node sets and each cost decrement
                         (cost decrement -> route length before destroy - route length after destroy)
-        @param batchNum: number of batch data
+        @param batch_num: number of batch data
         @param device: model device
         @return: loss
         """
-        destroyNum = len(destroys[0])
+        destroy_num = len(destroys[0])
 
         nf = self.nodeLayer(graphs.ndata['coord'])
         next_nf = self.gnn(graphs, nf)
         ef = self.edgeLayer(graphs, next_nf)
 
         # TODO: time
-        unbatchGraphs = dgl.unbatch(graphs)
+        unbatched_graphs = dgl.unbatch(graphs)
         gs_to_destroy = []
-        destroy_lst = []
-        for g, destroy in zip(unbatchGraphs, destroys):
+        destroy_list = []
+        for g, destroy in zip(unbatched_graphs, destroys):
             gs_to_destroy.extend([g] * len(destroy))
-            destroy_lst.extend(list(destroys[0].keys()))
-        destroyedGraph = destroyBatchGraph(gs_to_destroy, destroy_lst, device)
+            destroy_list.extend(list(destroys[0].keys()))
+        destroyedGraph = destroyBatchGraph(gs_to_destroy, destroy_list, device)
 
         # TODO: time
         desSrc, desDst = [], []
@@ -158,13 +171,14 @@ class DestroyEdgewise(nn.Module):
         for i, dg in enumerate(dgl.unbatch(destroyedGraph)):
             desSrc.extend([dg.edges()[0][dg.edata['connected'] == 1] + node_cnt])
             desDst.extend([dg.edges()[1][dg.edata['connected'] == 1] + node_cnt])
-            if i % destroyNum == 0 and i > 0:
+            if i % destroy_num == 0 and i > 0:
                 node_cnt += dg.number_of_nodes()
 
         srcIdx = torch.cat(desSrc)
         dstIdx = torch.cat(desDst)
         mask = graphs.edge_ids(srcIdx, dstIdx)
-        input_ef = ef[mask].reshape(batchNum, len(destroys[0]), -1, ef.shape[-1])
+        # input_ef = ef[mask].reshape(batchNum, len(destroys[0]), -1, ef.shape[-1])
+        input_ef = ef[mask].view(batch_num * destroy_num, -1, ef.shape[-1])
 
         pred = self.mlp(input_ef) + 1e-10
 

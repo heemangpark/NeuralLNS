@@ -5,12 +5,13 @@ import sys
 from pathlib import Path
 
 import numpy as np
+from tqdm import trange
 
 sys.path.append(os.path.dirname(os.path.abspath(os.path.dirname(__file__))))
 from utils.graph import validGraph
 
 curr_path = os.path.realpath(__file__)
-scenario_dir = os.path.join(Path(curr_path).parent.parent, 'scenarios')
+scenario_dir = os.path.join(Path(curr_path).parent.parent, 'data/scenarios/')
 
 """
 1. Create random grid graph (user defined size, obstacle ratio)
@@ -22,7 +23,7 @@ scenario_dir = os.path.join(Path(curr_path).parent.parent, 'scenarios')
 def save_scenarios(itrs=100, size=32, obs=20, T=1, a=10, t=20):
     instance, graph = validGraph(size, obs)
 
-    for itr in range(10020, 10030):
+    for itr in trange(itrs):
 
         empty_idx = list(range(len(graph)))
         agent_idx = random.sample(empty_idx, a)
@@ -37,7 +38,7 @@ def save_scenarios(itrs=100, size=32, obs=20, T=1, a=10, t=20):
             tasks.append(np.array([t for t in graph])[temp_idx].tolist())
 
         datas = [instance, graph, agent_pos, tasks]
-        dir = scenario_dir + '/{}{}{}_{}_{}/'.format(size, size, obs, a, t)
+        dir = scenario_dir + '/{}{}{}_{}_{}_eval/'.format(size, size, obs, a, t)
 
         try:
             if not os.path.exists(dir):

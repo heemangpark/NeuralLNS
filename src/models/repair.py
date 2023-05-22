@@ -5,7 +5,7 @@ import networkx as nx
 import torch
 from torch import nn as nn
 
-from src.models.gnn import GNN, GNNLayerEdgewise
+from src.models.MPGNN import MPGNN, FC_Edges
 
 
 def tempDestroy(assign, graph, removal):
@@ -37,14 +37,14 @@ class Repair(nn.Module):
     def __init__(self, embedding_dim=64):
         super(Repair, self).__init__()
         self.init_node_embedding = nn.Linear(2, embedding_dim)
-        self.gnn = GNN(
+        self.gnn = MPGNN(
             in_dim=embedding_dim,
             out_dim=embedding_dim,
             embedding_dim=embedding_dim,
             n_layers=2,
             residual=True,
         )
-        self.edge_layer = GNNLayerEdgewise(embedding_dim * 2, embedding_dim)
+        self.edge_layer = FC_Edges(embedding_dim * 2, embedding_dim)
         self.score_layer = nn.Linear(embedding_dim * 2, 1)
 
     def forward(self, assign, graph, removal):
@@ -111,7 +111,7 @@ class NeuroRepair(nn.Module):
         self.device = 'cuda' if train else 'cpu'
         self.embedding_dim = embedding_dim
         self.embedding = nn.Linear(2, embedding_dim)
-        self.gnn = GNN(
+        self.gnn = MPGNN(
             in_dim=embedding_dim,
             out_dim=embedding_dim,
             embedding_dim=embedding_dim,
