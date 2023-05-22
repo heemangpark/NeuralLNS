@@ -1,0 +1,9 @@
+type: eval_data
+seed: 3298
+num_data: 100
+map_size: 64
+obs_ratio: 20
+num_agent: 5
+num_task: 50
+solver_dir: PBS/pbs
+save_dir: PBS/eval
