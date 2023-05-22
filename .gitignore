@@ -1,5 +1,5 @@
 # exceptions
-!/config/data/
+!config/data/
 
 __pycache__/
 .git/
