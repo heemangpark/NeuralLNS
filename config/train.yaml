@@ -1,7 +1,7 @@
-batch_num: 500 # 500 100 50 10 5
+batch_num: 50 # 500 100 50 10 5
 data_size: 5000
 device: cuda:1
-epochs: 1000
+epochs: 300
 method: topK
 seed: 3298
 wandb: False

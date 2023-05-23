@@ -166,19 +166,18 @@ class DestroyEdgewise(nn.Module):
         destroyedGraph = destroyBatchGraph(gs_to_destroy, destroy_list, device)
 
         # TODO: time
-        desSrc, desDst = [], []
+        des_src, des_dst = [], []
         node_cnt = 0
         for i, dg in enumerate(dgl.unbatch(destroyedGraph)):
-            desSrc.extend([dg.edges()[0][dg.edata['connected'] == 1] + node_cnt])
-            desDst.extend([dg.edges()[1][dg.edata['connected'] == 1] + node_cnt])
+            des_src.extend([dg.edges()[0][dg.edata['connected'] == 1] + node_cnt])
+            des_dst.extend([dg.edges()[1][dg.edata['connected'] == 1] + node_cnt])
             if i % destroy_num == 0 and i > 0:
                 node_cnt += dg.number_of_nodes()
 
-        srcIdx = torch.cat(desSrc)
-        dstIdx = torch.cat(desDst)
-        mask = graphs.edge_ids(srcIdx, dstIdx)
-        # input_ef = ef[mask].reshape(batchNum, len(destroys[0]), -1, ef.shape[-1])
-        input_ef = ef[mask].view(batch_num * destroy_num, -1, ef.shape[-1])
+        src_idx = torch.cat(des_src)
+        dst_idx = torch.cat(des_dst)
+        mask = graphs.edge_ids(src_idx, dst_idx)
+        input_ef = ef[mask].reshape(batch_num, len(destroys[0]), -1, ef.shape[-1])
 
         pred = self.mlp(input_ef) + 1e-10
 

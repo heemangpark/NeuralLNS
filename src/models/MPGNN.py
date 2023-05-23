@@ -50,7 +50,7 @@ class MPLayers(nn.Module):
 
 
 class MPGNN(nn.Module):
-    def __init__(self, in_dim, out_dim, embedding_dim, n_layers, aggr: str = 'min', residual=False):
+    def __init__(self, in_dim, out_dim, embedding_dim, n_layers, aggr: str, residual: bool):
         super(MPGNN, self).__init__()
         self.is_residual = residual
 
@@ -62,14 +62,12 @@ class MPGNN(nn.Module):
             gnn_layers.append(MPLayers(i, o, aggr))
         self.gnn_layers = nn.ModuleList(gnn_layers)
 
-        self.W = nn.Linear(embedding_dim, 1)
-
     def forward(self, graph: dgl.DGLGraph, node_feat: torch.Tensor):
         node_feat_p = node_feat
-        for layer in self.layers:
+        for layer in self.gnn_layers:
             node_feat_p = layer(graph, node_feat_p)
 
-        if self.residual:
+        if self.is_residual:
             return node_feat + node_feat_p
         else:
             return node_feat_p
