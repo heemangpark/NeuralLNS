@@ -10,6 +10,7 @@ from pathlib import Path
 import dgl
 import numpy as np
 import torch
+import tqdm
 from omegaconf import OmegaConf
 from tqdm import trange
 
@@ -237,8 +238,9 @@ def train(cfg: dict):
 
     hyperparameter_defaults = dict(
         batch_size=cfg.data_size // cfg.batch_num,
-        learning_rate=cfg.model.lr,
-        aggregator=cfg.model.aggr
+        aggregator=cfg.model.aggr,
+        learning_rate=cfg.optimizer.lr,
+        weight_decay=cfg.optimizer.weight_decay
     )
 
     config_dictionary = dict(
@@ -250,7 +252,10 @@ def train(cfg: dict):
         import wandb
         wandb.init(project='NeuralLNS', name=date, config=config_dictionary)
 
-    model = DestroyEdgewise(device=cfg.device, lr=cfg.model.lr, aggr=cfg.model.aggr)
+    model = DestroyEdgewise(device=cfg.device,
+                            lr=cfg.optimizer.lr,
+                            weight_decay=cfg.optimizer.weight_decay,
+                            aggr=cfg.model.aggr)
 
     batch_size = cfg.data_size // cfg.batch_num
     data_idx = list(range(cfg.data_size))
@@ -284,7 +289,7 @@ def train(cfg: dict):
             wandb.log({'epoch_loss': epoch_loss})
 
         if (e + 1) % 10 == 0:
-            dir = 'data/trained/models/{}/'.format(date)
+            dir = 'datas/trained/models/{}/'.format(date)
             if not os.path.exists(dir):
                 os.makedirs(dir)
             torch.save(model.state_dict(), dir + '{}_{}.pt'.format(cfg.method, e + 1))
@@ -301,7 +306,7 @@ def eval(cfg: dict):
     map_index = random.choices(np.arange(len(os.listdir('../data/eval_data/550/'))), cfg.eval_num)
     entire_eval_perf = 0
 
-    for map_id in map_index:
+    for map_id in tqdm(map_index):
         " EECBS solver directory setup "
         solver_dir = os.path.join(Path(os.path.realpath(__file__)).parent.parent, 'PBS/pbs')
         save_dir = os.path.join(Path(os.path.realpath(__file__)).parent.parent, 'PBS/{}/'.

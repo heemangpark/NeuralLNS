@@ -4,8 +4,11 @@ device: cuda:1
 epochs: 300
 method: topK
 seed: 3298
-wandb: False
+wandb: True
 
 model:
-  lr: 1e-3
-  aggr: max
+  aggr: min
+
+optimizer:
+  lr: 1e-4
+  weight_decay: 1e-2

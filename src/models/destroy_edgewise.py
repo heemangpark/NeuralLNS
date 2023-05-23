@@ -112,16 +112,23 @@ class MLP(nn.Module):
 
 
 class DestroyEdgewise(nn.Module):
-    def __init__(self, embedding_dim=64, gnn_layers=3, device=None, lr=1e-3, aggr: str = 'min'):
+    def __init__(self,
+                 emb_dim: int = 64,
+                 gnn_layers: int = 3,
+                 device: str = 'cuda:1',
+                 lr: float = 1e-4,
+                 weight_decay: float = 1e-2,
+                 aggr: str = 'min'):
+
         super(DestroyEdgewise, self).__init__()
-        self.embedding_dim = embedding_dim
-        self.nodeLayer = nn.Linear(2, embedding_dim)
-        self.edgeLayer = FC_Edges(embedding_dim * 2, embedding_dim)
+        self.embedding_dim = emb_dim
+        self.nodeLayer = nn.Linear(2, emb_dim)
+        self.edgeLayer = FC_Edges(emb_dim * 2, emb_dim)
 
         self.gnn = MPGNN(
-            in_dim=embedding_dim,
-            out_dim=embedding_dim,
-            embedding_dim=embedding_dim,
+            in_dim=emb_dim,
+            out_dim=emb_dim,
+            embedding_dim=emb_dim,
             n_layers=gnn_layers,
             aggr=aggr,
             residual=True,
@@ -129,16 +136,11 @@ class DestroyEdgewise(nn.Module):
 
         self.mlp = MLP()
 
-        # self.mlp = MLP(in_channels=64,
-        #                hidden_channels=94,
-        #                out_channels=1,
-        #                num_layers=3)
-
         self.optimizer = Lion(self.parameters(),
                               lr=lr,
-                              weight_decay=1e-4,
+                              weight_decay=weight_decay,
                               use_triton=True)
-        # self.loss = nn.KLDivLoss(reduction='batchmean')
+
         self.to(device)
 
     def learn(self, graphs: dgl.DGLHeteroGraph, destroys: list, batch_num: int, device: str):
