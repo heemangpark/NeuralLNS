@@ -228,7 +228,7 @@ def eval_data(cfg):
                     assign_idx = temp_assign_idx
 
             data.append(pre_cost)
-        with open('data/eval_data/eval_data{}.pkl'.format(exp_num), 'wb') as f:
+        with open('datas/eval_data/eval_data{}.pkl'.format(exp_num), 'wb') as f:
             pickle.dump(data, f)
 
 
@@ -268,7 +268,7 @@ def train(cfg: dict):
             batch_graph, batch_destroy = [], []
 
             for d_id in data_idx[b * batch_size: (b + 1) * batch_size]:
-                with open('data/train_data/train_data{}.pkl'.format(d_id), 'rb') as f:  # TODO
+                with open('datas/train_data/train_data{}.pkl'.format(d_id), 'rb') as f:  # TODO
                     graph, destroy = pickle.load(f)
                     if cfg.method == 'topK':
                         destroy = dict(sorted(destroy.items(), key=lambda x: abs(x[1]), reverse=True)[:10])
@@ -320,7 +320,7 @@ def eval(cfg: dict):
             print("Error: Cannot create the directory.")
 
         " Load initial solution "
-        with open('data/eval_data/eval_data{}.pkl'.format(map_id), 'rb') as f:
+        with open('datas/eval_data/eval_data{}.pkl'.format(map_id), 'rb') as f:
             info, graph, lns = pickle.load(f)
 
         " LNS procedure "
