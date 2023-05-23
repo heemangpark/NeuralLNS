@@ -1,6 +1,8 @@
 cand_size: 10
 device: cuda:1
-dir: datas/trained/models/XXXX_XXXX/XXXX.pt
+dir: datas/trained/models/0523_102128/topK_70.pt
 eval_num: 100
 seed: 3298
 type: neural  # neural, heuristic
+solver_dir: PBS/pbs
+save_dir: PBS/eval
