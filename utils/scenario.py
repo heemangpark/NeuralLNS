@@ -22,7 +22,17 @@ def save_scenarios(itrs: int,
                    size: int,
                    obs: int,
                    a: int,
-                   t: int):
+                   t: int,
+                   seed: int,
+                   train: bool
+                   ):
+    seed_everything(seed)
+
+    if train:
+        dir = scenario_dir + '/{}{}{}_{}_{}/'.format(size, size, obs, a, t)
+    else:
+        dir = scenario_dir + '/{}{}{}_{}_{}_eval/'.format(size, size, obs, a, t)
+
     instance, graph = valid_graph(size, obs)
 
     for itr in trange(itrs):
@@ -40,7 +50,6 @@ def save_scenarios(itrs: int,
             tasks.append(np.array([t for t in graph])[temp_idx].tolist())
 
         datas = [instance, graph, agent_pos, tasks]
-        dir = scenario_dir + '/{}{}{}_{}_{}_eval/'.format(size, size, obs, a, t)
 
         try:
             if not os.path.exists(dir):
@@ -56,8 +65,9 @@ def save_scenarios(itrs: int,
 def task_only_scenarios(itrs: int,
                         size: int,
                         obs: int,
-                        t: int):
-    seed_everything(3298)
+                        t: int,
+                        seed: int):
+    seed_everything(seed)
 
     dir = scenario_dir + '/test_destroy/'
     map, map_graph = valid_graph(size, obs)
@@ -109,5 +119,6 @@ def load_scenarios(dir):
 
 
 if __name__ == "__main__":
-    # save_scenarios(itrs=100, size=32, obs=20, a=5, t=10)
-    task_only_scenarios(itrs=10000, size=32, obs=20, t=10)
+    save_scenarios(itrs=10000, size=32, obs=20, a=4, t=20, seed=42, train=True)
+    save_scenarios(itrs=2000, size=32, obs=20, a=4, t=20, seed=422, train=False)
+    # task_only_scenarios(itrs=10000, size=32, obs=20, t=10, seed=42)
