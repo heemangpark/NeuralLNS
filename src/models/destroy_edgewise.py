@@ -9,9 +9,6 @@ from torch.distributions.categorical import Categorical as C
 from src.models.MPGNN import MPGNN, CompleteEdges
 
 
-# from torch_geometric.nn.models import MLP
-
-
 def destroyGraph(graph, destroy, device):
     discon, con = torch.LongTensor([0]).to(device), torch.LongTensor([1]).to(device)
     g = copy.deepcopy(graph)

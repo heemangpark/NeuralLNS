@@ -3,6 +3,7 @@ import os
 import pickle
 import random
 import shutil
+import sys
 from datetime import datetime
 from itertools import combinations
 from pathlib import Path
@@ -13,6 +14,7 @@ import torch
 from omegaconf import OmegaConf
 from tqdm import trange, tqdm
 
+sys.path.append(os.path.dirname(os.path.abspath(os.path.dirname(__file__))))
 from src.heuristics.hungarian import hungarian
 from src.heuristics.regret import f_ijk
 from src.heuristics.shaw import removal
@@ -498,6 +500,8 @@ def test_destroy(cfg: dict):
 
         if cfg.wandb:
             wandb.log({'epoch_loss': epoch_loss})
+
+    torch.save(model.state_dict(), 'datas/trained/models/test_destroy.pt')
 
 
 def _getConfigPath(func):
