@@ -17,6 +17,7 @@ from src.heuristics.hungarian import hungarian
 from src.heuristics.regret import f_ijk
 from src.heuristics.shaw import removal
 from src.models.destroy_edgewise import DestroyEdgewise
+from src.models.destroy_edgewise import TestDestroy
 from utils.graph import convert_to_nx
 from utils.scenario import load_scenarios
 from utils.seed import seed_everything
@@ -267,7 +268,7 @@ def train(cfg: dict):
             batch_graph, batch_destroy = [], []
 
             for d_id in data_idx[b * batch_size: (b + 1) * batch_size]:
-                with open('datas/train_data/train_data{}.pkl'.format(d_id), 'rb') as f:  # TODO
+                with open('datas/train_data/train_data{}.pkl'.format(d_id), 'rb') as f:
                     graph, destroy = pickle.load(f)
                     if cfg.method == 'topK':
                         destroy = dict(sorted(destroy.items(), key=lambda x: abs(x[1]), reverse=True)[:10])
@@ -344,8 +345,6 @@ def eval(cfg: dict):
                 temp_assign_idx = copy.deepcopy(assign_idx)
                 temp_graph = copy.deepcopy(graph)
                 num_tasks = (temp_graph.ndata['type'] == 2).sum().item()
-                if num_tasks == 0:
-                    print('')
                 destroyCand = [c for c in combinations(range(num_tasks), 3)]
                 candDestroy = random.sample(destroyCand, cfg.cand_size)
                 removal_idx = model.act(temp_graph, candDestroy, 'greedy', cfg.device)
@@ -448,6 +447,57 @@ def eval(cfg: dict):
             print("Error: Cannot remove the directory.")
 
     print(entire_model_perf / cfg.eval_num, entire_baseline_perf / cfg.eval_num)
+
+
+def test_destroy(cfg: dict):
+    date = datetime.now().strftime("%m%d_%H%M%S")
+    seed_everything(cfg.seed)
+
+    hyperparameter_defaults = dict(
+        batch_size=cfg.data_size // cfg.batch_num,
+        aggregator=cfg.model.aggr,
+        learning_rate=cfg.optimizer.lr,
+        weight_decay=cfg.optimizer.weight_decay
+    )
+
+    config_dictionary = dict(
+        yaml='../config/test_destroy.yaml',
+        params=hyperparameter_defaults,
+    )
+
+    if cfg.wandb:
+        import wandb
+        wandb.init(project='NeuralLNS', name=date, config=config_dictionary)
+
+    model = TestDestroy(device=cfg.device,
+                        lr=cfg.optimizer.lr,
+                        weight_decay=cfg.optimizer.weight_decay,
+                        aggr=cfg.model.aggr)
+
+    batch_size = cfg.data_size // cfg.batch_num
+    data_idx = list(range(cfg.data_size))
+
+    for _ in trange(cfg.epochs):
+        random.shuffle(data_idx)
+        epoch_loss = 0
+
+        for b in range(cfg.batch_num):
+            batch_graphs, batch_target = [], []
+
+            for d_id in data_idx[b * batch_size: (b + 1) * batch_size]:
+                with open('datas/scenarios/test_destroy/{}.pkl'.format(d_id), 'rb') as f:
+                    graphs, targets = pickle.load(f)
+                batch_graphs.append(graphs)
+                batch_target.append(targets)
+
+            batch_graphs = dgl.batch(batch_graphs)
+            batch_loss = model(batch_graphs, batch_target)
+            epoch_loss += batch_loss
+
+        epoch_loss /= cfg.batch_num
+
+        if cfg.wandb:
+            wandb.log({'epoch_loss': epoch_loss})
 
 
 def _getConfigPath(func):

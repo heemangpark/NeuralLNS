@@ -1,0 +1,13 @@
+batch_num: 100
+data_size: 10000
+device: cuda:1
+epochs: 100
+seed: 3298
+wandb: True
+
+model:
+  aggr: min
+
+optimizer:
+  lr: 1e-4
+  weight_decay: 1e-2

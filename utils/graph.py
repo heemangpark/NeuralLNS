@@ -68,7 +68,7 @@ def grid_to_dgl(world, rand_coord=True, four_dir=True):
     return g
 
 
-def validGraph(size=32, obs=20, rand_coord=False):
+def valid_graph(size=32, obs=20, rand_coord=False):
     instance = np.zeros((size, size))
     obstacle = np.random.random((size, size)) <= obs / 100
     instance[obstacle] = 1

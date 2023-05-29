@@ -22,7 +22,7 @@ class MPLayers(nn.Module):
 
     def message_func(self, edges):
         u, v = edges.src['nf'], edges.dst['nf']
-        e_u_v = edges.data['dist'].view(-1, 1)
+        e_u_v = edges.data['astar'].view(-1, 1)
         feature = torch.concat([u, e_u_v, v], -1)
         msg = self.edge_W(feature)
 
@@ -73,9 +73,9 @@ class MPGNN(nn.Module):
             return node_feat_p
 
 
-class FC_Edges(nn.Module):
+class CompleteEdges(nn.Module):
     def __init__(self, in_dim, out_dim):
-        super(FC_Edges, self).__init__()
+        super(CompleteEdges, self).__init__()
         self.edge_W = nn.Sequential(nn.Linear(in_dim, out_dim, bias=False), nn.LeakyReLU())
 
     def forward(self, graph: dgl.DGLGraph, node_feat):

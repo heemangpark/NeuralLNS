@@ -4,30 +4,32 @@ import random
 import sys
 from pathlib import Path
 
+import dgl
+import networkx as nx
 import numpy as np
+import torch
 from tqdm import trange
 
 sys.path.append(os.path.dirname(os.path.abspath(os.path.dirname(__file__))))
-from utils.graph import validGraph
+from utils.graph import valid_graph
+from utils.seed import seed_everything
 
 curr_path = os.path.realpath(__file__)
-scenario_dir = os.path.join(Path(curr_path).parent.parent, 'data/scenarios/')
-
-"""
-1. Create random grid graph (user defined size, obstacle ratio)
-2. Initialize the predefined positions of the agents and tasks
-3. Save grid, graph, initial agent positions, task
-"""
+scenario_dir = os.path.join(Path(curr_path).parent.parent, 'datas/scenarios/')
 
 
-def save_scenarios(itrs=100, size=32, obs=20, T=1, a=10, t=20):
-    instance, graph = validGraph(size, obs)
+def save_scenarios(itrs: int,
+                   size: int,
+                   obs: int,
+                   a: int,
+                   t: int):
+    instance, graph = valid_graph(size, obs)
 
     for itr in trange(itrs):
-
         empty_idx = list(range(len(graph)))
         agent_idx = random.sample(empty_idx, a)
-        tasks_len = [1 for _ in range(t)] if T == 1 else random.choices(list(range(1, T + 1)), k=t)
+        tasks_len = [1 for _ in range(t)]
+        # tasks_len = [1 for _ in range(t)] if T == 1 else random.choices(list(range(1, T + 1)), k=t)
         agent_pos = np.array([a for a in graph])[agent_idx]
         empty_idx = list(set(empty_idx) - set(agent_idx))
 
@@ -51,6 +53,47 @@ def save_scenarios(itrs=100, size=32, obs=20, T=1, a=10, t=20):
                 pickle.dump(d, f)
 
 
+def task_only_scenarios(itrs: int,
+                        size: int,
+                        obs: int,
+                        t: int):
+    seed_everything(3298)
+
+    dir = scenario_dir + '/test_destroy/'
+    map, map_graph = valid_graph(size, obs)
+
+    for itr in trange(itrs):
+        empty_idx = list(range(len(map_graph)))
+        task_graph_id, task_coord = [], []
+        for i in range(t):
+            task_idx = random.sample(empty_idx, 1)[0]
+            empty_idx.remove(task_idx)
+            t_g_id = list(map_graph.nodes())[task_idx]
+            t_coord = map_graph.nodes[t_g_id]['loc']
+            task_graph_id.append(t_g_id)
+            task_coord.append(t_coord)
+
+        y = torch.LongTensor([nx.astar_path_length(map_graph, i, j)
+                              for i in task_graph_id for j in task_graph_id]).view(10, 10)
+
+        x = nx.complete_graph(t, nx.DiGraph)
+        nx.set_node_attributes(x, dict(zip(x.nodes(), task_coord)), name='coord')
+        nx.set_edge_attributes(x, dict(zip(x.edges(), [y[r.item(), c.item()].item()
+                                                       for r, c in zip(y.nonzero(as_tuple=True)[0],
+                                                                       y.nonzero(as_tuple=True)[1])])), name='astar')
+        x = dgl.from_networkx(x, node_attrs=['coord'], edge_attrs=['astar'])
+        x.edata['astar'] = x.edata['astar'].float()
+
+        try:
+            if not os.path.exists(dir):
+                os.makedirs(dir)
+        except OSError:
+            print("Error: Cannot create the directory.")
+
+        with open(dir + '{}.pkl'.format(itr), 'wb') as f:
+            pickle.dump([x, y], f)
+
+
 def load_scenarios(dir):
     dir = scenario_dir + '/' + dir
     data_list = []
@@ -66,4 +109,5 @@ def load_scenarios(dir):
 
 
 if __name__ == "__main__":
-    save_scenarios(itrs=100, size=64, obs=20, T=1, a=5, t=50)
+    # save_scenarios(itrs=100, size=32, obs=20, a=5, t=10)
+    task_only_scenarios(itrs=10000, size=32, obs=20, t=10)

@@ -1,5 +1,6 @@
 import bisect
 
+import networkx as nx
 import numpy as np
 
 
@@ -18,9 +19,16 @@ class Node:
         return self.g + self.h < other.g + other.h
 
 
-def graph_astar(start, end, returnCostOnly=False, g=None):
+def graph_astar(start, end,
+                g: nx.DiGraph,
+                return_cost_only: bool = False
+                ):
     if start[0] == end[0] and start[1] == end[1]:
-        return 0, 0
+        if return_cost_only:
+            return 0
+        else:
+            return 0, 0
+
     start = tuple(start)
     end = tuple(end)
     path = list()
@@ -54,8 +62,8 @@ def graph_astar(start, end, returnCostOnly=False, g=None):
                 path = path[::-1]
                 for p in range(len(path) - 1):
                     path_cost += g.edges[path[p], path[p + 1]]['dist'].item()
-                if returnCostOnly:
-                    return path_cost  # Return reversed path
+                if return_cost_only:
+                    return path_cost
                 else:
                     return path, path_cost
             else:

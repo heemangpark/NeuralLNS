@@ -6,7 +6,7 @@ from lion_pytorch import Lion
 from torch import nn as nn
 from torch.distributions.categorical import Categorical as C
 
-from src.models.MPGNN import MPGNN, FC_Edges
+from src.models.MPGNN import MPGNN, CompleteEdges
 
 
 # from torch_geometric.nn.models import MLP
@@ -122,8 +122,8 @@ class DestroyEdgewise(nn.Module):
 
         super(DestroyEdgewise, self).__init__()
         self.embedding_dim = emb_dim
-        self.nodeLayer = nn.Linear(2, emb_dim)
-        self.edgeLayer = FC_Edges(emb_dim * 2, emb_dim)
+        self.node_W = nn.Linear(2, emb_dim)
+        self._get_edge_embedding = CompleteEdges(emb_dim * 2, emb_dim)
 
         self.gnn = MPGNN(
             in_dim=emb_dim,
@@ -154,9 +154,9 @@ class DestroyEdgewise(nn.Module):
         """
         destroy_num = len(destroys[0])
 
-        nf = self.nodeLayer(graphs.ndata['coord'])
+        nf = self.node_W(graphs.ndata['coord'])
         next_nf = self.gnn(graphs, nf)
-        ef = self.edgeLayer(graphs, next_nf)
+        ef = self._get_edge_embedding(graphs, next_nf)
 
         # TODO: time
         unbatched_graphs = dgl.unbatch(graphs)
@@ -184,11 +184,8 @@ class DestroyEdgewise(nn.Module):
         pred = self.mlp(input_ef) + 1e-10
 
         " cost: original value - destroyed value (+ better, - worse)"
-        # cost = torch.Tensor([list(map(lambda x: x / 64, list(d.values()))) for d in destroys]).to(device)
         cost = torch.Tensor([list(d.values()) for d in destroys]).to(device)
         baseline = torch.tile(torch.mean(cost, dim=-1).view(-1, 1), dims=(1, 10)).detach()
-        # softmax = nn.Softmax(dim=-1)
-        # cost = softmax(cost)
 
         # loss = self.loss(pred.log(), cost)
         loss = torch.mean(-(cost - baseline) * torch.log(pred))  # REINFORCE
@@ -207,9 +204,9 @@ class DestroyEdgewise(nn.Module):
         @return: the best node set to destroy
         """
 
-        nf = self.nodeLayer(graph.ndata['coord'])
+        nf = self.node_W(graph.ndata['coord'])
         next_nf = self.gnn(graph, nf)
-        ef = self.edgeLayer(graph, next_nf)
+        ef = self._get_edge_embedding(graph, next_nf)
 
         ' Before modification '
         destroyed_graphs = [destroyGraph(graph, d, device) for d in destroyCand]  # TODO: destroyBatch ?
@@ -234,3 +231,57 @@ class DestroyEdgewise(nn.Module):
             act = m.sample()
 
         return destroyCand[act]
+
+
+class TestDestroy(nn.Module):
+    def __init__(self,
+                 emb_dim: int = 64,
+                 gnn_layers: int = 3,
+                 device: str = 'cuda:1',
+                 lr: float = 1e-4,
+                 weight_decay: float = 1e-2,
+                 aggr: str = 'min'):
+        super(TestDestroy, self).__init__()
+
+        self.device = device
+        self.embedding_dim = emb_dim
+        self.node_W = nn.Linear(2, emb_dim)
+        self.y_hat_W = nn.Linear(emb_dim, 1)
+        self._get_edge_embedding = CompleteEdges(emb_dim * 2, emb_dim)
+
+        self.gnn = MPGNN(
+            in_dim=emb_dim,
+            out_dim=emb_dim,
+            embedding_dim=emb_dim,
+            n_layers=gnn_layers,
+            aggr=aggr,
+            residual=True,
+        )
+
+        self.optimizer = Lion(self.parameters(),
+                              lr=lr,
+                              weight_decay=weight_decay,
+                              use_triton=True)
+
+        self.loss = nn.L1Loss()
+
+        self.to(device)
+
+    def forward(self, graphs, targets):
+        graphs = graphs.to(self.device)
+        nf = graphs.ndata['coord'].float().to(self.device)
+        nf = self.node_W(nf)
+
+        x = self.gnn(graphs, nf)
+        y_hat = self._get_edge_embedding(graphs, x)
+        y_hat = self.y_hat_W(y_hat).view(-1)
+
+        y = [y.view(-1)[y.view(-1).nonzero(as_tuple=True)[0]].to(self.device) for y in targets]
+        y = torch.cat(y)
+
+        loss = self.loss(y_hat, y)
+        self.optimizer.zero_grad()
+        loss.backward()
+        self.optimizer.step()
+
+        return loss.item()

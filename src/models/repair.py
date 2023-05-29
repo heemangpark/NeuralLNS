@@ -5,7 +5,7 @@ import networkx as nx
 import torch
 from torch import nn as nn
 
-from src.models.MPGNN import MPGNN, FC_Edges
+from src.models.MPGNN import MPGNN, CompleteEdges
 
 
 def tempDestroy(assign, graph, removal):
@@ -44,7 +44,7 @@ class Repair(nn.Module):
             n_layers=2,
             residual=True,
         )
-        self.edge_layer = FC_Edges(embedding_dim * 2, embedding_dim)
+        self.edge_layer = CompleteEdges(embedding_dim * 2, embedding_dim)
         self.score_layer = nn.Linear(embedding_dim * 2, 1)
 
     def forward(self, assign, graph, removal):
