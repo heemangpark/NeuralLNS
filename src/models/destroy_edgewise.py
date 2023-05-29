@@ -140,7 +140,7 @@ class DestroyEdgewise(nn.Module):
 
         self.to(device)
 
-    def learn(self, graphs: dgl.DGLHeteroGraph, destroys: list, batch_num: int, device: str):
+    def forward(self, graphs: dgl.DGLHeteroGraph, destroys: list, batch_num: int, device: str):
         """
         @param graphs: original graph (without destroy yet)
         @param destroys: destroyed node sets and each cost decrement

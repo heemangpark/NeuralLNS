@@ -30,7 +30,6 @@ def train_data(cfg,
                process_num: int = 0
                ):
     seed_everything(cfg.seed)
-
     num_data_per_process = cfg.num_data // cfg.n_processes
     if process_num == 0:
         exp_num_range = trange(num_data_per_process * process_num, num_data_per_process * (process_num + 1))
@@ -125,7 +124,7 @@ def train_data(cfg,
                 cost_dict[D] = decrement
 
         total_data = [init_graph, cost_dict]
-        with open('data/train_data/train_data{}.pkl'.format(exp_num), 'wb') as f:
+        with open('datas/train_data/train_data_{}_{}.pkl'.format(cfg.map_size, exp_num), 'wb') as f:
             pickle.dump(total_data, f)
 
 
@@ -238,7 +237,7 @@ def eval_data(cfg,
                     assign_idx = temp_assign_idx
             data.append(pre_cost)
 
-        with open('datas/eval_data/eval_data{}.pkl'.format(exp_num), 'wb') as f:
+        with open('datas/eval_data/eval_data_{}_{}.pkl'.format(cfg.map_size, exp_num), 'wb') as f:
             pickle.dump(data, f)
 
 
@@ -291,7 +290,7 @@ def train(cfg: dict):
                     batch_destroy.append(destroy)
             batch_graph = dgl.batch(batch_graph).to(cfg.device)
 
-            batch_loss = model.learn(batch_graph, batch_destroy, batch_size, device=cfg.device)
+            batch_loss = model(batch_graph, batch_destroy, batch_size, device=cfg.device)
             epoch_loss += batch_loss
         epoch_loss /= cfg.batch_num
 
@@ -541,7 +540,6 @@ def run(cfg_mode, cfg_path):
         globals()[cfg_mode](cfg)
     else:
         from multiprocessing import Process
-        # p = [Process(target=globals()[cfg_mode], args=(cfg, p_id), )
-        #      for p_id in range(cfg.num_data // cfg.n_processes)]
-        for p_id in range(cfg.num_data // cfg.n_processes):
+        # p = [Process(target=globals()[cfg_mode], args=(cfg, p_id), ) for p_id in range(cfg.n_processes)]
+        for p_id in range(cfg.n_processes):
             Process(target=globals()[cfg_mode], args=(cfg, p_id), ).start()

@@ -15,7 +15,7 @@ from utils.graph import valid_graph
 from utils.seed import seed_everything
 
 curr_path = os.path.realpath(__file__)
-scenario_dir = os.path.join(Path(curr_path).parent.parent, 'datas/scenarios/')
+scenario_dir = os.path.join(Path(curr_path).parent.parent, 'datas/scenarios')
 
 
 def save_scenarios(itrs: int,

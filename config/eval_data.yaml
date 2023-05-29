@@ -1,5 +1,5 @@
 seed: 3298
-num_data: 100
+num_data: 2000
 map_size: 32
 obs_ratio: 20
 num_agent: 4
