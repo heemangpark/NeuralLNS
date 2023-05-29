@@ -510,7 +510,7 @@ def test_destroy(cfg: dict):
     "evaluation"
     model.eval()
     score = 0
-    for e_id in eval_idx:
+    for e_id in tqdm(eval_idx):
         with open('datas/scenarios/test_destroy/{}.pkl'.format(e_id), 'rb') as f:
             graph, target = pickle.load(f)
         y_hat = model._eval(graph).cpu()
