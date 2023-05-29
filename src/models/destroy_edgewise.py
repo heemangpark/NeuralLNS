@@ -282,3 +282,14 @@ class TestDestroy(nn.Module):
         self.optimizer.step()
 
         return loss.item()
+
+    def _eval(self, graphs):
+        graphs = graphs.to(self.device)
+        nf = graphs.ndata['coord'].float().to(self.device)
+        nf = self.node_W(nf)
+
+        x = self.gnn(graphs, nf)
+        y_hat = self._get_edge_embedding(graphs, x)
+        y_hat = self.y_hat_W(y_hat)
+
+        return y_hat

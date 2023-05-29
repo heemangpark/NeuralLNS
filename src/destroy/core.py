@@ -476,17 +476,21 @@ def test_destroy(cfg: dict):
                         weight_decay=cfg.optimizer.weight_decay,
                         aggr=cfg.model.aggr)
 
+    train_size = int(cfg.data_size * .7)
+    eval_size = int(cfg.data_size * .3)
+
     batch_size = cfg.data_size // cfg.batch_num
-    data_idx = list(range(cfg.data_size))
+    train_idx = list(range(cfg.data_size))
+    eval_idx = list(range(train_size, cfg.data_size))
 
     for _ in trange(cfg.epochs):
-        random.shuffle(data_idx)
+        random.shuffle(train_idx)
         epoch_loss = 0
 
         for b in range(cfg.batch_num):
             batch_graphs, batch_target = [], []
 
-            for d_id in data_idx[b * batch_size: (b + 1) * batch_size]:
+            for d_id in train_idx[b * batch_size: (b + 1) * batch_size]:
                 with open('datas/scenarios/test_destroy/{}.pkl'.format(d_id), 'rb') as f:
                     graphs, targets = pickle.load(f)
                 batch_graphs.append(graphs)
@@ -502,6 +506,16 @@ def test_destroy(cfg: dict):
             wandb.log({'epoch_loss': epoch_loss})
 
     torch.save(model.state_dict(), 'datas/trained/models/test_destroy.pt')
+
+    "evaluation"
+    model.eval()
+    score = 0
+    for e_id in eval_idx:
+        with open('datas/scenarios/test_destroy/{}.pkl'.format(e_id), 'rb') as f:
+            graph, target = pickle.load(f)
+        y_hat = model._eval(graph).cpu()
+        score += torch.mean(torch.abs(y_hat - target.view(-1)[target.view(-1).nonzero()]))
+    print(score / eval_size)
 
 
 def _getConfigPath(func):
