@@ -5,6 +5,7 @@ import torch
 from lion_pytorch import Lion
 from torch import nn as nn
 from torch.distributions.categorical import Categorical as C
+from torch_geometric.nn.models import MLP
 
 from src.models.MPGNN import MPGNN, CompleteEdges
 
@@ -87,25 +88,25 @@ def destroyBatchGraph(graphs: list, destroy, device=None):
     return batched_g
 
 
-class MLP(nn.Module):
-    def __init__(self, input_size=64, hidden_size=32):
-        super(MLP, self).__init__()
-
-        self.linear = nn.Sequential(
-            nn.Linear(input_size, hidden_size),
-            nn.LeakyReLU(),
-            nn.Linear(hidden_size, 1)
-        )
-
-        self.softmax = nn.Softmax(dim=-1)
-
-    def forward(self, input):
-        x = self.linear(input)
-        x = x.squeeze()
-        x = torch.sum(x, -1)
-        x = self.softmax(x)
-
-        return x
+# class MLP(nn.Module):
+#     def __init__(self, input_size=64, hidden_size=32):
+#         super(MLP, self).__init__()
+#
+#         self.linear = nn.Sequential(
+#             nn.Linear(input_size, hidden_size),
+#             nn.LeakyReLU(),
+#             nn.Linear(hidden_size, 1)
+#         )
+#
+#         self.softmax = nn.Softmax(dim=-1)
+#
+#     def forward(self, input):
+#         x = self.linear(input)
+#         x = x.squeeze()
+#         x = torch.sum(x, -1)
+#         x = self.softmax(x)
+#
+#         return x
 
 
 class DestroyEdgewise(nn.Module):
@@ -131,13 +132,16 @@ class DestroyEdgewise(nn.Module):
             residual=True,
         )
 
-        self.mlp = MLP()
+        self.mlp = MLP([emb_dim, 1])
 
         self.optimizer = Lion(self.parameters(),
                               lr=lr,
                               weight_decay=weight_decay,
                               use_triton=True)
 
+        self.loss = nn.MarginRankingLoss()
+
+        self.device = device
         self.to(device)
 
     def forward(self, graphs: dgl.DGLHeteroGraph, destroys: list, batch_num: int, device: str):
@@ -177,16 +181,21 @@ class DestroyEdgewise(nn.Module):
         dst_idx = torch.cat(des_dst)
         mask = graphs.edge_ids(src_idx, dst_idx)
         input_ef = ef[mask].reshape(batch_num, len(destroys[0]), -1, ef.shape[-1])
-
+        input_ef = torch.sum(input_ef, -2)
         pred = self.mlp(input_ef)
+        pred = pred.squeeze(-1)
 
         " cost: original value - destroyed value (+ better, - worse)"
-        cost = torch.Tensor([list(d.values()) for d in destroys]).to(device)
-        # baseline = torch.tile(torch.mean(cost, dim=-1).view(-1, 1), dims=(1, 10)).detach()
+        x1, x2 = pred[:, :5], pred[:, 5:]
+        sign = torch.ones(batch_num, 5).to(self.device)
 
+        # cost = torch.Tensor([list(d.values()) for d in destroys]).to(device)
+        # baseline = torch.tile(torch.mean(cost, dim=-1).view(-1, 1), dims=(1, 10)).detach()
         # loss = self.loss(pred.log(), cost)
         # loss = torch.mean(-(cost - baseline) * torch.log(pred + 1e-5))
-        loss = torch.mean(-cost * torch.log(pred + 1e-5))
+        # loss = torch.mean(-cost * torch.log(pred + 1e-5))
+
+        loss = self.loss(x1, x2, sign)
         self.optimizer.zero_grad()
         loss.backward()
         self.optimizer.step()

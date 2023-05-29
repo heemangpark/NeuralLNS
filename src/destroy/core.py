@@ -281,9 +281,9 @@ def train(cfg: dict):
                     graph, destroy = pickle.load(f)
                     if cfg.method == 'topK':
                         destroy = dict(sorted(destroy.items(), key=lambda x: x[1]))
-                        destroy = dict(zip(destroy.keys(), np.arange(0, 1, 1 / len(destroy)).tolist()))
-                        # destroy = dict(sorted(destroy.items(), key=lambda x: abs(x[1]), reverse=True)[:5] +
-                        #                sorted(destroy.items(), key=lambda x: abs(x[1]), reverse=False)[:5])
+                        # destroy = dict(zip(destroy.keys(), np.arange(0, 1, 1 / len(destroy)).tolist()))
+                        destroy = dict(sorted(destroy.items(), key=lambda x: abs(x[1]), reverse=False)[:5] +
+                                       sorted(destroy.items(), key=lambda x: abs(x[1]), reverse=True)[:5])
                     elif cfg.method == 'randomK':
                         random_key = list(destroy.keys())
                         random.shuffle(random_key)

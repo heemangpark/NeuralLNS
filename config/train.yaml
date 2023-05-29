@@ -1,4 +1,4 @@
-batch_num: 50
+batch_num: 1000
 data_size: 5000
 device: cuda:1
 epochs: 100
