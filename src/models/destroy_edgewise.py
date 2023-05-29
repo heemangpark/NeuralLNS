@@ -178,14 +178,15 @@ class DestroyEdgewise(nn.Module):
         mask = graphs.edge_ids(src_idx, dst_idx)
         input_ef = ef[mask].reshape(batch_num, len(destroys[0]), -1, ef.shape[-1])
 
-        pred = self.mlp(input_ef) + 1e-10
+        pred = self.mlp(input_ef)
 
         " cost: original value - destroyed value (+ better, - worse)"
         cost = torch.Tensor([list(d.values()) for d in destroys]).to(device)
-        baseline = torch.tile(torch.mean(cost, dim=-1).view(-1, 1), dims=(1, 10)).detach()
+        # baseline = torch.tile(torch.mean(cost, dim=-1).view(-1, 1), dims=(1, 10)).detach()
 
         # loss = self.loss(pred.log(), cost)
-        loss = torch.mean(-(cost - baseline) * torch.log(pred))  # REINFORCE
+        # loss = torch.mean(-(cost - baseline) * torch.log(pred + 1e-5))
+        loss = torch.mean(-cost * torch.log(pred + 1e-5))
         self.optimizer.zero_grad()
         loss.backward()
         self.optimizer.step()

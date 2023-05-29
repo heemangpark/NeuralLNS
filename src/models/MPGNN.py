@@ -22,7 +22,7 @@ class MPLayers(nn.Module):
 
     def message_func(self, edges):
         u, v = edges.src['nf'], edges.dst['nf']
-        e_u_v = edges.data['astar'].view(-1, 1)
+        e_u_v = edges.data['dist'].view(-1, 1)
         feature = torch.concat([u, e_u_v, v], -1)
         msg = self.edge_W(feature)
 

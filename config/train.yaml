@@ -4,7 +4,7 @@ device: cuda:1
 epochs: 100
 method: topK
 seed: 3298
-wandb: False
+wandb: True
 
 model:
   aggr: min

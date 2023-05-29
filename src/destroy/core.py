@@ -277,10 +277,13 @@ def train(cfg: dict):
             batch_graph, batch_destroy = [], []
 
             for d_id in data_idx[b * batch_size: (b + 1) * batch_size]:
-                with open('datas/train_data/train_data{}.pkl'.format(d_id), 'rb') as f:
+                with open('datas/train_data_64/train_data{}.pkl'.format(d_id), 'rb') as f:
                     graph, destroy = pickle.load(f)
                     if cfg.method == 'topK':
-                        destroy = dict(sorted(destroy.items(), key=lambda x: abs(x[1]), reverse=True)[:10])
+                        destroy = dict(sorted(destroy.items(), key=lambda x: x[1]))
+                        destroy = dict(zip(destroy.keys(), np.arange(0, 1, 1 / len(destroy)).tolist()))
+                        # destroy = dict(sorted(destroy.items(), key=lambda x: abs(x[1]), reverse=True)[:5] +
+                        #                sorted(destroy.items(), key=lambda x: abs(x[1]), reverse=False)[:5])
                     elif cfg.method == 'randomK':
                         random_key = list(destroy.keys())
                         random.shuffle(random_key)
@@ -301,7 +304,7 @@ def train(cfg: dict):
             dir = 'datas/trained/models/{}/'.format(date)
             if not os.path.exists(dir):
                 os.makedirs(dir)
-            torch.save(model.state_dict(), dir + '{}_{}.pt'.format(cfg.method, e + 1))
+            torch.save(model.state_dict(), dir + '{}.pt'.format(e + 1))
 
 
 def eval(cfg: dict):
