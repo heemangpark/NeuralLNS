@@ -1,8 +1,8 @@
 seed: 3298
 num_data: 100
-map_size: 64
+map_size: 32
 obs_ratio: 20
-num_agent: 5
-num_task: 50
+num_agent: 4
+num_task: 20
 solver_dir: PBS/pbs
 save_dir: PBS/eval

@@ -26,7 +26,9 @@ from utils.seed import seed_everything
 from utils.solver import solver
 
 
-def train_data(cfg, process_num: int = 0):
+def train_data(cfg,
+               process_num: int = 0
+               ):
     seed_everything(cfg.seed)
 
     num_data_per_process = cfg.num_data // cfg.n_processes
@@ -35,7 +37,6 @@ def train_data(cfg, process_num: int = 0):
     else:
         exp_num_range = range(num_data_per_process * process_num, num_data_per_process * (process_num + 1))
     for exp_num in exp_num_range:
-        # total_data
         scenario = load_scenarios('{}{}{}_{}_{}/scenario_{}.pkl'
                                   .format(cfg.map_size, cfg.map_size,
                                           cfg.obs_ratio,
@@ -60,7 +61,6 @@ def train_data(cfg, process_num: int = 0):
         if info['init_cost'] == 'error':
             return 'abandon_cfg.seed'
 
-        # data = [init_graph]
         assign_idx, assign_pos = info['lns']
         pre_cost = info['init_cost']
 
@@ -129,10 +129,18 @@ def train_data(cfg, process_num: int = 0):
             pickle.dump(total_data, f)
 
 
-def eval_data(cfg):
+def eval_data(cfg,
+              process_num: int = 0
+              ):
     seed_everything(cfg.seed)
 
-    for exp_num in trange(cfg.num_data):
+    num_data_per_process = cfg.num_data // cfg.n_processes
+    if process_num == 0:
+        exp_num_range = trange(num_data_per_process * process_num, num_data_per_process * (process_num + 1))
+    else:
+        exp_num_range = range(num_data_per_process * process_num, num_data_per_process * (process_num + 1))
+
+    for exp_num in exp_num_range:
         scenario = load_scenarios('{}{}{}_{}_{}_eval/scenario_{}.pkl'
                                   .format(cfg.map_size, cfg.map_size,
                                           cfg.obs_ratio,
@@ -228,8 +236,8 @@ def eval_data(cfg):
                 if cost < pre_cost:
                     pre_cost = cost
                     assign_idx = temp_assign_idx
-
             data.append(pre_cost)
+
         with open('datas/eval_data/eval_data{}.pkl'.format(exp_num), 'wb') as f:
             pickle.dump(data, f)
 
@@ -529,4 +537,11 @@ def _getConfigPath(func):
 @_getConfigPath
 def run(cfg_mode, cfg_path):
     cfg = OmegaConf.load(cfg_path)
-    globals()[cfg_mode](cfg)
+    if (cfg_mode == 'train') or (cfg_mode == 'eval') or (cfg_mode == 'test_destroy'):
+        globals()[cfg_mode](cfg)
+    else:
+        from multiprocessing import Process
+        # p = [Process(target=globals()[cfg_mode], args=(cfg, p_id), )
+        #      for p_id in range(cfg.num_data // cfg.n_processes)]
+        for p_id in range(cfg.num_data // cfg.n_processes):
+            Process(target=globals()[cfg_mode], args=(cfg, p_id), ).start()
