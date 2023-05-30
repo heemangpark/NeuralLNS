@@ -35,7 +35,7 @@ def save_scenarios(itrs: int,
 
     instance, graph = valid_graph(size, obs)
 
-    for itr in trange(itrs):
+    for itr in range(itrs):
         empty_idx = list(range(len(graph)))
         agent_idx = random.sample(empty_idx, a)
         tasks_len = [1 for _ in range(t)]
@@ -120,5 +120,4 @@ def load_scenarios(dir):
 
 if __name__ == "__main__":
     save_scenarios(itrs=10000, size=32, obs=20, a=4, t=20, seed=42, train=True)
-    save_scenarios(itrs=2000, size=32, obs=20, a=4, t=20, seed=422, train=False)
     # task_only_scenarios(itrs=10000, size=32, obs=20, t=10, seed=42)

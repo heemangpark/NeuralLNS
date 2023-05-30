@@ -50,6 +50,12 @@ def train_data(cfg,
 
         coordination = [[a.tolist()] + t for a, t in zip(info['agents'], assign_pos)]
         init_graph = convert_to_nx(assign_id, coordination, info['grid'].shape[0])
+        dgl_graph = dgl.from_networkx(init_graph,
+                                      node_attrs=['coord', 'type', 'idx', 'graph_id'],
+                                      edge_attrs=['dist', 'connected'])
+        dgl_graph.edata['dist'] = dgl_graph.edata['dist'].to(torch.float32)
+        # dgl_graph = dgl_graph.to(cfg.device)
+
         info['init_cost'], _ = solver(
             info['grid'],
             info['agents'],
@@ -123,8 +129,8 @@ def train_data(cfg,
                 decrement = pre_cost - cost  # decrement
                 cost_dict[D] = decrement
 
-        total_data = [init_graph, cost_dict]
-        with open('datas/train_data/train_data_{}_{}.pkl'.format(cfg.map_size, exp_num), 'wb') as f:
+        total_data = [dgl_graph, cost_dict]
+        with open('datas/train_data_{}/train_data{}.pkl'.format(cfg.map_size, exp_num), 'wb') as f:
             pickle.dump(total_data, f)
 
 
@@ -277,7 +283,7 @@ def train(cfg: dict):
             batch_graph, batch_destroy = [], []
 
             for d_id in data_idx[b * batch_size: (b + 1) * batch_size]:
-                with open('datas/train_data_64/train_data{}.pkl'.format(d_id), 'rb') as f:
+                with open('datas/train_data_64/train_data{}.pkl'.format(569), 'rb') as f:
                     graph, destroy = pickle.load(f)
                     if cfg.method == 'topK':
                         destroy = dict(sorted(destroy.items(), key=lambda x: x[1]))
