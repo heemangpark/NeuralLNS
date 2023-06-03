@@ -14,7 +14,7 @@ sys.path.append(os.path.dirname(os.path.abspath(os.path.dirname(__file__))))
 from src.heuristics.hungarian import hungarian
 from src.heuristics.regret import f_ijk, get_regret
 from src.heuristics.shaw import removal
-from utils.graph import convert_to_nx
+from utils.graph import sch_to_dgl
 from src.models.repair import NeuroRepair
 from utils.scenario import load_scenarios
 from utils.solver import to_solver, solver
@@ -51,7 +51,7 @@ def NLNS(info, graph, dir):
                 for i, coords in enumerate(assign.values()):
                     temp_schedule = [list(c.values())[0][0] for c in coords]
                     coordination[i].extend(temp_schedule)
-                graph = convert_to_nx(assign_id, coordination, info['grid'].shape[0])
+                graph = sch_to_dgl(assign_id, coordination, info['grid'].shape[0])
                 results.append(pre_cost)
             elif cost >= pre_cost:
                 results.append(pre_cost)

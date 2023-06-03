@@ -73,7 +73,7 @@ def to_solver(task_in_seq, assignment):
     return s_in_tasks
 
 
-def solver(instance, agents, tasks, solver_dir, save_dir, exp_name, ret_log=False):
+def solver(map, agents, tasks, solver_dir, save_dir, exp_name, ret_log=False):
     time_log = dict()
     s_agents = copy.deepcopy(agents)
     todo = copy.deepcopy(tasks)
@@ -88,8 +88,8 @@ def solver(instance, agents, tasks, solver_dir, save_dir, exp_name, ret_log=Fals
                 s_tasks.append([list(a)])
             else:
                 s_tasks.append([t[0]])
-        save_map(instance, exp_name, save_dir)
-        save_scenario(s_agents, s_tasks, exp_name, instance.shape[0], instance.shape[1], save_dir)
+        save_map(map, exp_name, save_dir)
+        save_scenario(s_agents, s_tasks, exp_name, map.shape[0], map.shape[1], save_dir)
 
         c = [solver_dir,
              "-m",

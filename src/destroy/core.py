@@ -20,54 +20,26 @@ from src.heuristics.regret import f_ijk
 from src.heuristics.shaw import removal
 from src.models.destroy_edgewise import DestroyEdgewise
 from src.models.destroy_edgewise import TestDestroy
-from utils.graph import convert_to_nx
+from utils.graph import sch_to_dgl
 from utils.scenario import load_scenarios
 from utils.seed import seed_everything
 from utils.solver import solver
 
 
-def train_data(cfg,
-               process_num: int = 0
-               ):
+def train_data(cfg: dict):
     seed_everything(cfg.seed)
-    num_data_per_process = cfg.num_data // cfg.n_processes
-    if process_num == 0:
-        exp_num_range = trange(num_data_per_process * process_num, num_data_per_process * (process_num + 1))
-    else:
-        exp_num_range = range(num_data_per_process * process_num, num_data_per_process * (process_num + 1))
-    for exp_num in exp_num_range:
-        scenario = load_scenarios('{}{}{}_{}_{}/scenario_{}.pkl'
-                                  .format(cfg.map_size, cfg.map_size,
-                                          cfg.obs_ratio,
-                                          cfg.num_agent,
-                                          cfg.num_task,
-                                          exp_num))
+    for exp_num in trange(cfg.num_data):
+        grid, grid_graph, a_coord, t_coord = load_scenarios('{}{}{}_{}_{}/scenario_{}.pkl'
+                                                            .format(cfg.map_size, cfg.map_size, cfg.obs_ratio,
+                                                                    cfg.num_agent, cfg.num_task, exp_num))
+        assign_idx, assign_coord = hungarian(a_coord, t_coord)
+        schedule = [[a] + t for a, t in zip(a_coord, assign_coord)]
+        sch_graph = sch_to_dgl(assign_idx, schedule, grid.shape[0])
 
-        info = {'grid': scenario[0], 'graph': scenario[1], 'agents': scenario[2],
-                'tasks': [t[0] for t in scenario[3]]}
-        assign_id, assign_pos = hungarian(info['graph'], info['agents'], info['tasks'])
-        info['lns'] = assign_id, assign_pos
-
-        coordination = [[a.tolist()] + t for a, t in zip(info['agents'], assign_pos)]
-        init_graph = convert_to_nx(assign_id, coordination, info['grid'].shape[0])
-        dgl_graph = dgl.from_networkx(init_graph,
-                                      node_attrs=['coord', 'type', 'idx', 'graph_id'],
-                                      edge_attrs=['dist', 'connected'])
-        dgl_graph.edata['dist'] = dgl_graph.edata['dist'].to(torch.float32)
-        # dgl_graph = dgl_graph.to(cfg.device)
-
-        info['init_cost'], _ = solver(
-            info['grid'],
-            info['agents'],
-            assign_pos,
-            solver_dir=cfg.solver_dir,
-            save_dir=cfg.save_dir,
-            exp_name='init')
-        if info['init_cost'] == 'error':
-            return 'abandon_cfg.seed'
-
-        assign_idx, assign_pos = info['lns']
-        pre_cost = info['init_cost']
+        init_cost, _ = solver(grid, a_coord, assign_coord,
+                              solver_dir=cfg.solver_dir, save_dir=cfg.save_dir, exp_name='init')
+        if init_cost == 'error':
+            return 'abandon_seed'
 
         full_set = list(combinations(range(cfg.num_task), 3))
         random.shuffle(full_set)
@@ -87,7 +59,7 @@ def train_data(cfg,
                         removed[i] = True
 
             while len(removal_idx) != 0:
-                f_val = f_ijk(temp_assign_idx, info['agents'], removal_idx, info['tasks'], info['graph'])
+                f_val = f_ijk(a_coord, t_coord, temp_assign_idx, removal_idx)
 
                 # get min regret
                 regrets = np.stack(list(f_val.values()))
@@ -111,12 +83,12 @@ def train_data(cfg,
                 temp_assign_idx[ag_idx].insert(ins_pos, re_ins)
                 removal_idx.remove(re_ins)
 
-                assign_pos = [np.array(info['tasks'])[schedule].tolist() for schedule in temp_assign_idx]
+                assign_coord = [np.array(t_coord)[schedule].tolist() for schedule in temp_assign_idx]
 
                 cost, _, time_log = solver(
-                    info['grid'],
-                    info['agents'],
-                    assign_pos,
+                    grid,
+                    a_coord,
+                    assign_coord,
                     solver_dir=cfg.solver_dir,
                     save_dir=cfg.save_dir,
                     exp_name=str(exp_num),
@@ -126,19 +98,16 @@ def train_data(cfg,
             if cost == 'error':
                 pass
             else:
-                decrement = pre_cost - cost  # decrement
+                decrement = init_cost - cost  # decrement
                 cost_dict[D] = decrement
 
-        total_data = [dgl_graph, cost_dict]
+        total_data = [sch_graph, cost_dict]
         with open('datas/train_data_{}/train_data{}.pkl'.format(cfg.map_size, exp_num), 'wb') as f:
             pickle.dump(total_data, f)
 
 
-def eval_data(cfg,
-              process_num: int = 0
-              ):
+def eval_data(cfg, process_num: int = 0):
     seed_everything(cfg.seed)
-
     num_data_per_process = cfg.num_data // cfg.n_processes
     if process_num == 0:
         exp_num_range = trange(num_data_per_process * process_num, num_data_per_process * (process_num + 1))
@@ -159,7 +128,7 @@ def eval_data(cfg,
         info['lns'] = assign_id, assign_pos
 
         coordination = [[a.tolist()] + t for a, t in zip(info['agents'], assign_pos)]
-        init_graph = convert_to_nx(assign_id, coordination, info['grid'].shape[0])
+        init_graph = sch_to_dgl(assign_id, coordination, info['grid'].shape[0])
         info['init_cost'], _, time_log = solver(
             info['grid'],
             info['agents'],
@@ -438,7 +407,7 @@ def eval(cfg: dict):
                     results.append(pre_cost)
                     if cfg.type == 'neural':
                         coordination = [[a.tolist()] + t for a, t in zip(info['agents'], assign_pos)]
-                        next_nx_graph = convert_to_nx(assign_idx, coordination, info['grid'].shape[0])
+                        next_nx_graph = sch_to_dgl(assign_idx, coordination, info['grid'].shape[0])
                         next_graph = dgl.from_networkx(
                             next_nx_graph,
                             node_attrs=['coord', 'type', 'idx', 'graph_id'],
@@ -545,11 +514,4 @@ def _getConfigPath(func):
 @_getConfigPath
 def run(cfg_mode, cfg_path):
     cfg = OmegaConf.load(cfg_path)
-    if (cfg_mode == 'train') or (cfg_mode == 'eval') or (cfg_mode == 'test_destroy'):
-        globals()[cfg_mode](cfg)
-    else:
-        globals()[cfg_mode](cfg)
-        # from multiprocessing import Process
-        # # p = [Process(target=globals()[cfg_mode], args=(cfg, p_id), ) for p_id in range(cfg.n_processes)]
-        # for p_id in range(cfg.n_processes):
-        #     Process(target=globals()[cfg_mode], args=(cfg, p_id), ).start()
+    globals()[cfg_mode](cfg)

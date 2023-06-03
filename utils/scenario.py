@@ -31,15 +31,17 @@ def save_scenarios(itrs: int, size: int, obs: int,
 
     grid, graph = valid_graph(size, obs)
 
-    for itr in range(itrs):
+    for itr in trange(itrs):
         grid_idx = list(range(len(graph)))
-        agent_idx = random.sample(grid_idx, a)
-        grid_idx = list(set(grid_idx) - set(agent_idx))
-        task_idx = random.sample(grid_idx, t)
+        a_idx = random.sample(grid_idx, a)
+        grid_idx = list(set(grid_idx) - set(a_idx))
+        t_idx = random.sample(grid_idx, t)
 
-        agent_coord = np.array(graph.nodes())[agent_idx].tolist()
-        task_coord = np.array(graph.nodes())[task_idx].tolist()
-        data = [grid, graph, agent_coord, task_coord]
+        # a_coord = [nx.get_node_attributes(graph, 'loc')[tuple(a_id)] for a_id in np.array(graph.nodes())[a_idx]]
+        # t_coord = [nx.get_node_attributes(graph, 'loc')[tuple(t_id)] for t_id in np.array(graph.nodes())[t_idx]]
+        a_coord = np.array(graph.nodes())[a_idx].tolist()
+        t_coord = np.array(graph.nodes())[t_idx].tolist()
+        data = [grid, graph, a_coord, t_coord]
 
         try:
             if not os.path.exists(dir):
@@ -94,18 +96,12 @@ def task_only_scenarios(itrs: int,
 
 def load_scenarios(dir):
     dir = scenario_dir + '/' + dir
-    data_list = []
     with open(dir, 'rb') as f:
-        while True:
-            try:
-                data = pickle.load(f)
-            except EOFError:
-                break
-            data_list.append(data)
+        data = pickle.load(f)
 
-    return data_list
+    return data
 
 
 if __name__ == "__main__":
-    save_scenarios(itrs=10, size=32, obs=20, a=4, t=20, seed=42, train=True)
-    # task_only_scenarios(itrs=10000, size=32, obs=20, t=10, seed=42)
+    save_scenarios(itrs=10000, size=32, obs=20, a=4, t=20, seed=42, train=True)
+    save_scenarios(itrs=2000, size=32, obs=20, a=4, t=20, seed=43, train=False)

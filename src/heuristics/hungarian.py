@@ -1,8 +1,6 @@
 import numpy as np
 from scipy.optimize import linear_sum_assignment
 
-from utils.astar import graph_astar
-
 
 def manhattan(coord_1, coord_2):
     x = abs(list(coord_1)[0] - list(coord_2)[0])
@@ -17,6 +15,7 @@ def cost_matrix(g, a, t):
             # m[i][j] = graph_astar(g, a[i], t[j][0])[1]
             m[i][j] = manhattan(a[i], t[j][0])
     return m
+
 
 def manhattan_dist(xs, ys):
     xs = xs.reshape((-1, 1, 2))
@@ -59,27 +58,27 @@ def hungarian_prev(graph, ag_pos_initial, task_pos):
     return ret_dict, h_tasks
 
 
-def hungarian(graph, ag_pos_initial, task_pos):
-    n_ag = len(ag_pos_initial)
-    ag_pos_initial = np.array(ag_pos_initial)
-    task_pos = np.array(task_pos)
+def hungarian(a_coords, t_coords):
+    a_init_coords = np.array(a_coords)
+    t_coords = np.array(t_coords)
+    n_ag = len(a_init_coords)
     ret_assignments = [[] for _ in range(n_ag)]
-    ret_pos = [[] for _ in range(n_ag)]
+    ret_coords = [[] for _ in range(n_ag)]
 
-    cm_initial = manhattan_dist(ag_pos_initial, task_pos)
+    cm_init = manhattan_dist(a_init_coords, t_coords)
 
-    ag, assignment = linear_sum_assignment(cm_initial)
+    ag, assignment = linear_sum_assignment(cm_init)
     for a, t in zip(ag, assignment):
         ret_assignments[a].append(t)
-        ret_pos[a].append(task_pos[t].tolist())
-    tasks_idx = np.arange((len(task_pos)))
+        ret_coords[a].append(t_coords[t].tolist())
+    tasks_idx = np.arange((len(t_coords)))
     unassigned_idx = np.array(list(set(tasks_idx) - set(assignment)))
 
     while len(unassigned_idx) != 0:
         last_schedule_idx = [schedule[-1] for schedule in ret_assignments]
-        ag_pos = task_pos[last_schedule_idx]
-        unassigned_pos = task_pos[unassigned_idx]
-        cm = manhattan_dist(ag_pos, unassigned_pos)
+        a_coords = t_coords[last_schedule_idx]
+        unassigned_coords = t_coords[unassigned_idx]
+        cm = manhattan_dist(a_coords, unassigned_coords)
         ag, assignment = linear_sum_assignment(cm)
 
         # update index
@@ -89,6 +88,6 @@ def hungarian(graph, ag_pos_initial, task_pos):
         # append to ret dict
         for a, t in zip(ag, assignment):
             ret_assignments[a].append(t)
-            ret_pos[a].append(task_pos[t].tolist())
+            ret_coords[a].append(t_coords[t].tolist())
 
-    return ret_assignments, ret_pos
+    return ret_assignments, ret_coords
