@@ -7,4 +7,3 @@ num_task: 20
 destroy_per_map: 100
 solver_dir: PBS/pbs
 save_dir: PBS/train
-num_process: 10
