@@ -26,9 +26,9 @@ from utils.seed import seed_everything
 from utils.solver import solver
 
 
-def train_data(cfg: dict):
+def train_data(cfg: dict, p_id):
     seed_everything(cfg.seed)
-    for exp_num in trange(cfg.num_data):
+    for exp_num in trange(int(cfg.num_data / cfg.num_process * p_id)):
         grid, grid_graph, a_coord, t_coord = load_scenarios('{}{}{}_{}_{}/scenario_{}.pkl'
                                                             .format(cfg.map_size, cfg.map_size, cfg.obs_ratio,
                                                                     cfg.num_agent, cfg.num_task, exp_num))
@@ -513,5 +513,11 @@ def _getConfigPath(func):
 
 @_getConfigPath
 def run(cfg_mode, cfg_path):
-    cfg = OmegaConf.load(cfg_path)
-    globals()[cfg_mode](cfg)
+    if (cfg_mode == 'train') or (cfg_mode == 'eval'):
+        cfg = OmegaConf.load(cfg_path)
+        globals()[cfg_mode](cfg)
+    else:
+        from multiprocessing import Process
+        cfg = OmegaConf.load(cfg_path)
+        for p_id in range(cfg.num_process):
+            Process(target=globals()[cfg_mode], args=(cfg, p_id)).start()
