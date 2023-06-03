@@ -548,7 +548,8 @@ def run(cfg_mode, cfg_path):
     if (cfg_mode == 'train') or (cfg_mode == 'eval') or (cfg_mode == 'test_destroy'):
         globals()[cfg_mode](cfg)
     else:
-        from multiprocessing import Process
-        # p = [Process(target=globals()[cfg_mode], args=(cfg, p_id), ) for p_id in range(cfg.n_processes)]
-        for p_id in range(cfg.n_processes):
-            Process(target=globals()[cfg_mode], args=(cfg, p_id), ).start()
+        globals()[cfg_mode](cfg)
+        # from multiprocessing import Process
+        # # p = [Process(target=globals()[cfg_mode], args=(cfg, p_id), ) for p_id in range(cfg.n_processes)]
+        # for p_id in range(cfg.n_processes):
+        #     Process(target=globals()[cfg_mode], args=(cfg, p_id), ).start()

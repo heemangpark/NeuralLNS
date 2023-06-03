@@ -72,20 +72,20 @@ def valid_graph(size=32, obs=20, rand_coord=False):
     instance = np.zeros((size, size))
     obstacle = np.random.random((size, size)) <= obs / 100
     instance[obstacle] = 1
-    g = createGraph(instance, rand_coord=rand_coord)
+    g = _createGraph(instance, rand_coord=rand_coord)
     components = [c for c in nx.connected_components(g)]
 
     while len(components) != 1:
         instance = np.zeros((size, size))
         obstacle = np.random.random((size, size)) <= obs / 100
         instance[obstacle] = 1
-        g = createGraph(instance, rand_coord=rand_coord)
+        g = _createGraph(instance, rand_coord=rand_coord)
         components = [c for c in nx.connected_components(g)]
 
     return instance, g
 
 
-def createGraph(instance, rand_coord=False):
+def _createGraph(instance, rand_coord=False):
     instance = deepcopy(instance)
     m, n = instance.shape[0], instance.shape[1]
     g = nx.grid_2d_graph(m, n)
