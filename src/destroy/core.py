@@ -276,13 +276,12 @@ def train(cfg: dict):
 
 def eval(cfg: dict):
     seed_everything(cfg.seed)
-
-    " Load model "
-    model = DestroyEdgewise(device=cfg.device)
+    model = DestroyEdgewise(cfg)
     model.load_state_dict(torch.load(cfg.dir))
     model.eval()
 
-    map_index = list(range(len(os.listdir('datas/eval_data/550/'))))
+    eval_dir = 'datas/eval_data_64/'
+    map_index = list(range(len(os.listdir(eval_dir))))
     random.shuffle(map_index)
     map_index = map_index[:cfg.eval_num]
 
@@ -290,7 +289,6 @@ def eval(cfg: dict):
     entire_baseline_perf = 0
 
     for map_id in tqdm(map_index):
-        " EECBS solver directory setup "
         solver_dir = os.path.join(Path(os.path.realpath(__file__)).parent.parent, 'PBS/pbs')
         save_dir = os.path.join(Path(os.path.realpath(__file__)).parent.parent, 'PBS/{}/'.
                                 format(datetime.now().strftime("%m%d_%H%M%S")))
@@ -302,8 +300,8 @@ def eval(cfg: dict):
         except OSError:
             print("Error: Cannot create the directory.")
 
-        " Load initial solution "
-        with open('datas/eval_data/550/eval_data{}.pkl'.format(map_id), 'rb') as f:
+        # Load initial solution
+        with open(eval_dir + 'eval_data{}.pkl'.format(map_id), 'rb') as f:
             F = pickle.load(f)
             info, graph = F[0], F[1]
             graph = dgl.from_networkx(
@@ -324,9 +322,9 @@ def eval(cfg: dict):
                 temp_assign_idx = copy.deepcopy(assign_idx)
                 temp_graph = copy.deepcopy(graph)
                 num_tasks = (temp_graph.ndata['type'] == 2).sum().item()
-                destroyCand = [c for c in combinations(range(num_tasks), 3)]
-                candDestroy = random.sample(destroyCand, cfg.cand_size)
-                removal_idx = model.act(temp_graph, candDestroy, 'greedy', cfg.device)
+                destroys = [c for c in combinations(range(num_tasks), 3)]
+                candidates = random.sample(destroys, cfg.cand_size)
+                removal_idx = model.act(temp_graph, candidates)
                 removal_idx = list(removal_idx)
 
             elif cfg.type == 'heuristic':

@@ -4,7 +4,6 @@ import dgl
 import torch
 from lion_pytorch import Lion
 from torch import nn as nn
-from torch.distributions.categorical import Categorical as C
 
 from src.models.mpnn import MPNN, CompleteEdges
 
@@ -112,10 +111,11 @@ class DestroyEdgewise(nn.Module):
     def __init__(self, cfg: dict):
         super(DestroyEdgewise, self).__init__()
 
-        aggr, dim, num_layers, readout, _ = cfg.model.values()
+        aggr, delta, dim, num_layers, readout, _ = cfg.model.values()
         lr, wd = cfg.optimizer.values()
 
-        self.gnn = MPNN(in_dim=dim, out_dim=dim, embedding_dim=dim, n_layers=num_layers, aggr=aggr, residual=True)
+        self.gnn = MPNN(in_dim=dim, out_dim=dim, embedding_dim=dim, n_layers=num_layers,
+                        aggr=aggr, delta=delta, residual=True)
         self.readout = getattr(torch, readout)
         self.Wxz = nn.Linear(2, dim)
         self.Why = nn.Linear(dim, 1)
@@ -178,42 +178,11 @@ class DestroyEdgewise(nn.Module):
 
         return loss.item()
 
-    def act(self, graph: dgl.DGLHeteroGraph, destroyCand: list, evalMode: str, device: str):
-        """
-        @param graph: current graph status
-        @param destroyCand: destroy node sets candidate to search for
-        @param evalMode: greedy -> argmax model prediction, sample -> sample from softmax(prediction)
-        @param device: model device
-        @return: the best node set to destroy
-        """
-
-        nf = self.Wxz(graph.ndata['coord'])
-        next_nf = self.gnn(graph, nf)
-        ef = self._get_edge_embedding(graph, next_nf)
-
-        ' Before modification '
-        destroyed_graphs = [destroyGraph(graph, d, device) for d in destroyCand]  # TODO: destroyBatch ?
-
-        ' After modification '
-        ###############################################################
-
-        ###############################################################
-
-        DG = dgl.batch(destroyed_graphs)
-        SRC = DG.ndata['graph_id'][DG.edges()[0][DG.edata['connected'] == 1]]
-        DST = DG.ndata['graph_id'][DG.edges()[1][DG.edata['connected'] == 1]]
-        mask = graph.edge_ids(SRC, DST)
-        input_ef = ef[mask]
-        input_ef = input_ef.reshape(len(destroyCand), -1, input_ef.shape[-1])  # Batch X 94(=100-6) X emb
-        pred = self.mlp(input_ef)
-
-        if evalMode == 'greedy':
-            act = torch.argmax(pred).item()
-        else:
-            m = C(probs=pred)
-            act = m.sample()
-
-        return destroyCand[act]
+    def act(self, graph: dgl.DGLHeteroGraph, candidates: list):
+        temp = [dgl.node_subgraph(graph, list(set(range(graph.num_nodes()) - set(c)))) for c in candidates]
+        x = graph.ndata['coord']
+        z = self.Wxz(x)
+        z_p = self.gnn(graph, z)
 
 
 class TestDestroy(nn.Module):

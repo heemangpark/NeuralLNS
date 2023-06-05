@@ -4,11 +4,12 @@ import torch.nn as nn
 
 
 class MPNNLayer(nn.Module):
-    def __init__(self, in_dim, out_dim, aggr):
+    def __init__(self, in_dim, out_dim, aggr, delta):
         super(MPNNLayer, self).__init__()
         self.node_W = nn.Sequential(nn.Linear(out_dim + in_dim, out_dim, bias=False), nn.LeakyReLU())
         self.edge_W = nn.Sequential(nn.Linear(in_dim * 2 + 1, out_dim, bias=False), nn.LeakyReLU())
         self.aggr = aggr
+        self.delta = delta
 
     def forward(self, g: dgl.DGLGraph, node_feat):
         g.ndata['nf'] = node_feat
@@ -23,20 +24,25 @@ class MPNNLayer(nn.Module):
     def message_func(self, edges):
         u, v = edges.src['nf'], edges.dst['nf']
         e_u_v = edges.data['dist'].view(-1, 1)
+        edge_mask = edges.data['dist'] < self.delta
         feature = torch.concat([u, e_u_v, v], -1)
         msg = self.edge_W(feature)
 
-        return {'msg': msg}
+        return {'msg': msg, 'mask': edge_mask}
 
     def reduce_func(self, nodes):
+        mask = nodes.mailbox['mask'].unsqueeze(-1)
+        message = nodes.mailbox['msg']
+        masked_msg = message * mask
         if self.aggr == 'max':
-            msg = nodes.mailbox['msg'].max(1).values
+            msg = masked_msg.max(1).values
         elif self.aggr == 'min':
-            msg = nodes.mailbox['msg'].min(1).values
+            masked_msg += (masked_msg == 0) * 99999
+            msg = masked_msg.min(1).values
         elif self.aggr == 'sum':
-            msg = nodes.mailbox['msg'].sum(1).values
+            msg = masked_msg.sum(1)
         elif self.aggr == 'mean':
-            msg = nodes.mailbox['msg'].mean(1).values
+            msg = masked_msg.sum(1) / mask.sum(1)
         else:
             raise NotImplementedError
 
@@ -50,18 +56,15 @@ class MPNNLayer(nn.Module):
 
 
 class MPNN(nn.Module):
-    def __init__(self, in_dim, out_dim, embedding_dim, n_layers, aggr: str, residual: bool):
+    def __init__(self, in_dim: int, out_dim: int, embedding_dim: int, n_layers: int,
+                 aggr: str, delta: int, residual: bool):
         super(MPNN, self).__init__()
 
         ins = [in_dim] + [embedding_dim] * (n_layers - 1)
         outs = [embedding_dim] * (n_layers - 1) + [out_dim]
 
-        self.layers = nn.ModuleList([MPNNLayer(i, o, aggr) for i, o in zip(ins, outs)])
+        self.layers = nn.ModuleList([MPNNLayer(i, o, aggr, delta) for i, o in zip(ins, outs)])
         self.is_residual = residual
-        # layers = []
-        # for i, o in zip(ins, outs):
-        #     layers.append(MPNNLayer(i, o, aggr))
-        # self.gnn_layers = nn.ModuleList(layers)
 
     def forward(self, graph: dgl.DGLGraph, node_feat: torch.Tensor):
         if self.is_residual:

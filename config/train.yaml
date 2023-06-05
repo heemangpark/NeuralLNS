@@ -1,4 +1,4 @@
-device: cuda:3
+device: cuda:2
 epochs: 100
 num_batch: 64
 num_data: 4096
@@ -7,6 +7,7 @@ wandb: False
 
 model:
   aggr: max
+  delta: 10
   dim: 64
   num_layers: 3
   readout: sum

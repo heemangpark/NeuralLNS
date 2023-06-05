@@ -1,8 +1,19 @@
 cand_size: 10
 device: cuda:1
-dir: datas/trained/models/0523_102128/topK_70.pt
+dir: datas/trained/models/0605_173035/20.pt
 eval_num: 100
-seed: 3298
+seed: 42
 type: neural  # neural, heuristic
 solver_dir: PBS/pbs
 save_dir: PBS/eval
+
+model:
+  aggr: max
+  dim: 64
+  num_layers: 3
+  readout: mean
+  type: MPNN
+
+optimizer:
+  lr: 1e-4
+  weight_decay: 1e-2
