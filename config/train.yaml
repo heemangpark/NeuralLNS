@@ -1,14 +1,16 @@
-batch_num: 1000
-data_size: 5000
+batch_num: 64
+data_size: 4096
 device: cuda:1
 epochs: 100
-method: topK
-seed: 3298
-wandb: True
+seed: 42
+wandb: False
 
 model:
-  aggr: min
+  aggr: max
+  dim: 64
+  num_layers: 3
 
 optimizer:
+  _target_: lion_pytorch.Lion
   lr: 1e-4
   weight_decay: 1e-2

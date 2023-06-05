@@ -2,7 +2,7 @@ import dgl
 import torch
 from torch import nn as nn
 
-from src.models.MPGNN import MPGNN
+from src.models.mpnn import MPNN
 
 
 class MLP(nn.Module):
@@ -31,7 +31,7 @@ class DestroyNaive(nn.Module):
         super(DestroyNaive, self).__init__()
         self.embedding_dim = embedding_dim
         self.layer = nn.Linear(2, embedding_dim)
-        self.gnn = MPGNN(
+        self.gnn = MPNN(
             in_dim=embedding_dim,
             out_dim=embedding_dim,
             embedding_dim=embedding_dim,

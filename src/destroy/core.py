@@ -220,28 +220,25 @@ def train(cfg: dict):
     date = datetime.now().strftime("%m%d_%H%M%S")
     seed_everything(cfg.seed)
 
-    hyperparameter_defaults = dict(
-        batch_size=cfg.data_size // cfg.batch_num,
+    h_params = dict(
         aggregator=cfg.model.aggr,
         learning_rate=cfg.optimizer.lr,
         weight_decay=cfg.optimizer.weight_decay
     )
 
-    config_dictionary = dict(
-        yaml='../config/train.yaml',
-        params=hyperparameter_defaults,
-    )
+    config_dict = dict(yaml='../config/train.yaml', params=h_params)
 
     if cfg.wandb:
         import wandb
-        wandb.init(project='NeuralLNS', name=date, config=config_dictionary)
+        wandb.init(project='NeuralLNS',
+                   name=date,
+                   config=config_dict)
 
-    model = DestroyEdgewise(device=cfg.device,
-                            lr=cfg.optimizer.lr,
-                            weight_decay=cfg.optimizer.weight_decay,
-                            aggr=cfg.model.aggr)
+    model = DestroyEdgewise(model=cfg.model,
+                            optimizer=cfg.optimizer,
+                            device=cfg.device)
 
-    batch_size = cfg.data_size // cfg.batch_num
+    batch_size = h_params['batch_size']
     data_idx = list(range(cfg.data_size))
 
     for e in trange(cfg.epochs):
@@ -249,27 +246,28 @@ def train(cfg: dict):
         epoch_loss = 0
 
         for b in range(cfg.batch_num):
-            batch_graph, batch_destroy = [], []
+            graphs, labels = [], []
 
             for d_id in data_idx[b * batch_size: (b + 1) * batch_size]:
-                with open('datas/train_data_64/train_data{}.pkl'.format(569), 'rb') as f:
+                with open('datas/train_data_32/train_data{}.pkl'.format(d_id), 'rb') as f:
                     graph, destroy = pickle.load(f)
-                    if cfg.method == 'topK':
-                        destroy = dict(sorted(destroy.items(), key=lambda x: x[1]))
-                        # destroy = dict(zip(destroy.keys(), np.arange(0, 1, 1 / len(destroy)).tolist()))
-                        destroy = dict(sorted(destroy.items(), key=lambda x: abs(x[1]), reverse=False)[:5] +
-                                       sorted(destroy.items(), key=lambda x: abs(x[1]), reverse=True)[:5])
-                    elif cfg.method == 'randomK':
-                        random_key = list(destroy.keys())
-                        random.shuffle(random_key)
-                        random_key = random_key[:10]
-                        destroy = dict(zip(random_key, [destroy[k] for k in random_key]))
-                    batch_graph.append(graph)
-                    batch_destroy.append(destroy)
-            batch_graph = dgl.batch(batch_graph).to(cfg.device)
-
-            batch_loss = model(batch_graph, batch_destroy, batch_size, device=cfg.device)
+                    # (num_agent + num_task - num_node_per_destroy) * num_destroy -> (4 + 20 - 3) * 100
+                    b = dgl.batch([dgl.node_subgraph(graph, list(set(range(graph.num_nodes())) - set(d_key)))
+                                   for d_key in destroy.keys()])
+                    graphs.append(b)
+                    labels.extend(list(destroy.values()))
+                    # if cfg.method == 'topK':
+                    #     destroy = dict(sorted(destroy.items(), key=lambda x: x[1]))
+                    # elif cfg.method == 'randomK':
+                    #     random_key = list(destroy.keys())
+                    #     random.shuffle(random_key)
+                    #     random_key = random_key[:10]
+                    #     destroy = dict(zip(random_key, [destroy[k] for k in random_key]))
+            graphs = dgl.batch(graphs)
+            batch_loss = model(graphs, labels)
+            # temp = dgl.batch([dgl.node_subgraph(g, list(set(range(g.num_nodes())) - set(idx))) for idx in d.keys()])
             epoch_loss += batch_loss
+
         epoch_loss /= cfg.batch_num
 
         if cfg.wandb:

@@ -5,7 +5,7 @@ import networkx as nx
 import torch
 from torch import nn as nn
 
-from src.models.MPGNN import MPGNN, CompleteEdges
+from src.models.mpnn import MPNN, CompleteEdges
 
 
 def tempDestroy(assign, graph, removal):
@@ -37,7 +37,7 @@ class Repair(nn.Module):
     def __init__(self, embedding_dim=64):
         super(Repair, self).__init__()
         self.init_node_embedding = nn.Linear(2, embedding_dim)
-        self.gnn = MPGNN(
+        self.gnn = MPNN(
             in_dim=embedding_dim,
             out_dim=embedding_dim,
             embedding_dim=embedding_dim,
@@ -111,7 +111,7 @@ class NeuroRepair(nn.Module):
         self.device = 'cuda' if train else 'cpu'
         self.embedding_dim = embedding_dim
         self.embedding = nn.Linear(2, embedding_dim)
-        self.gnn = MPGNN(
+        self.gnn = MPNN(
             in_dim=embedding_dim,
             out_dim=embedding_dim,
             embedding_dim=embedding_dim,

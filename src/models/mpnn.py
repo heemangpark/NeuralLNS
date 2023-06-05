@@ -3,9 +3,9 @@ import torch
 import torch.nn as nn
 
 
-class MPLayers(nn.Module):
-    def __init__(self, in_dim, out_dim, aggr: str = 'min'):
-        super(MPLayers, self).__init__()
+class MPNNLayer(nn.Module):
+    def __init__(self, in_dim, out_dim, aggr):
+        super(MPNNLayer, self).__init__()
         self.node_W = nn.Sequential(nn.Linear(out_dim + in_dim, out_dim, bias=False), nn.LeakyReLU())
         self.edge_W = nn.Sequential(nn.Linear(in_dim * 2 + 1, out_dim, bias=False), nn.LeakyReLU())
         self.aggr = aggr
@@ -29,14 +29,14 @@ class MPLayers(nn.Module):
         return {'msg': msg}
 
     def reduce_func(self, nodes):
-        if self.aggr == 'sum':
-            msg = nodes.mailbox['msg'].sum(1).values
-        elif self.aggr == 'mean':
-            msg = nodes.mailbox['msg'].mean(1).values
-        elif self.aggr == 'max':
+        if self.aggr == 'max':
             msg = nodes.mailbox['msg'].max(1).values
         elif self.aggr == 'min':
             msg = nodes.mailbox['msg'].min(1).values
+        elif self.aggr == 'sum':
+            msg = nodes.mailbox['msg'].sum(1).values
+        elif self.aggr == 'mean':
+            msg = nodes.mailbox['msg'].mean(1).values
         else:
             raise NotImplementedError
 
@@ -49,28 +49,30 @@ class MPLayers(nn.Module):
         return {'nf_p': node_feat_p}
 
 
-class MPGNN(nn.Module):
+class MPNN(nn.Module):
     def __init__(self, in_dim, out_dim, embedding_dim, n_layers, aggr: str, residual: bool):
-        super(MPGNN, self).__init__()
-        self.is_residual = residual
+        super(MPNN, self).__init__()
 
         ins = [in_dim] + [embedding_dim] * (n_layers - 1)
         outs = [embedding_dim] * (n_layers - 1) + [out_dim]
 
-        gnn_layers = []
-        for i, o in zip(ins, outs):
-            gnn_layers.append(MPLayers(i, o, aggr))
-        self.gnn_layers = nn.ModuleList(gnn_layers)
+        self.layers = nn.ModuleList([MPNNLayer(i, o, aggr) for i, o in zip(ins, outs)])
+        self.is_residual = residual
+        # layers = []
+        # for i, o in zip(ins, outs):
+        #     layers.append(MPNNLayer(i, o, aggr))
+        # self.gnn_layers = nn.ModuleList(layers)
 
     def forward(self, graph: dgl.DGLGraph, node_feat: torch.Tensor):
-        node_feat_p = node_feat
-        for layer in self.gnn_layers:
-            node_feat_p = layer(graph, node_feat_p)
-
         if self.is_residual:
-            return node_feat + node_feat_p
+            for layer in self.gnn_layers:
+                node_feat_p = layer(graph, node_feat)
+                node_feat += node_feat_p
         else:
-            return node_feat_p
+            for layer in self.gnn_layers:
+                node_feat = layer(graph, node_feat)
+
+        return node_feat
 
 
 class CompleteEdges(nn.Module):

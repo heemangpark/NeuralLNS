@@ -7,7 +7,7 @@ from torch import nn as nn
 from torch.distributions.categorical import Categorical as C
 from torch_geometric.nn.models import MLP
 
-from src.models.MPGNN import MPGNN, CompleteEdges
+from src.models.mpnn import MPNN, CompleteEdges
 
 
 def destroyGraph(graph, destroy, device):
@@ -111,38 +111,29 @@ def destroyBatchGraph(graphs: list, destroy, device=None):
 
 class DestroyEdgewise(nn.Module):
     def __init__(self,
-                 emb_dim: int = 64,
-                 gnn_layers: int = 3,
-                 device: str = 'cuda:1',
-                 lr: float = 1e-4,
-                 weight_decay: float = 1e-2,
-                 aggr: str = 'min'):
-
+                 model: dict,
+                 optimizer: dict,
+                 device: str,
+                 ):
         super(DestroyEdgewise, self).__init__()
-        self.embedding_dim = emb_dim
-        self.node_W = nn.Linear(2, emb_dim)
-        self._get_edge_embedding = CompleteEdges(emb_dim * 2, emb_dim)
+        aggr, dim, num_layers = model.values()
+        opt, lr, wd = optimizer.values()
 
-        self.gnn = MPGNN(
-            in_dim=emb_dim,
-            out_dim=emb_dim,
-            embedding_dim=emb_dim,
-            n_layers=gnn_layers,
+        self.embedding_dim = model.dim
+        self.node_W = nn.Linear(2, dim)
+
+        self.gnn = MPNN(
+            in_dim=dim,
+            out_dim=dim,
+            embedding_dim=dim,
+            n_layers=num_layers,
             aggr=aggr,
             residual=True,
         )
 
-        self.mlp = MLP([emb_dim, 1])
-
-        self.optimizer = Lion(self.parameters(),
-                              lr=lr,
-                              weight_decay=weight_decay,
-                              use_triton=True)
-
-        self.loss = nn.MarginRankingLoss()
-
-        self.device = device
-        self.to(device)
+        self.mlp = MLP([dim, 1])
+        self.optimizer = Lion(self.parameters(), lr=lr, weight_decay=wd)
+        self.loss = nn.L1Loss()
 
     def forward(self, graphs: dgl.DGLHeteroGraph, destroys: list, batch_num: int, device: str):
         """
@@ -256,7 +247,7 @@ class TestDestroy(nn.Module):
         self.y_hat_W = nn.Linear(emb_dim, 1)
         self._get_edge_embedding = CompleteEdges(emb_dim * 2, emb_dim)
 
-        self.gnn = MPGNN(
+        self.gnn = MPNN(
             in_dim=emb_dim,
             out_dim=emb_dim,
             embedding_dim=emb_dim,
