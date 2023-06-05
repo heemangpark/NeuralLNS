@@ -65,11 +65,11 @@ class MPNN(nn.Module):
 
     def forward(self, graph: dgl.DGLGraph, node_feat: torch.Tensor):
         if self.is_residual:
-            for layer in self.gnn_layers:
+            for layer in self.layers:
                 node_feat_p = layer(graph, node_feat)
                 node_feat += node_feat_p
         else:
-            for layer in self.gnn_layers:
+            for layer in self.layers:
                 node_feat = layer(graph, node_feat)
 
         return node_feat

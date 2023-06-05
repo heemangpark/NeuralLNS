@@ -1,7 +1,7 @@
-batch_num: 64
-data_size: 4096
 device: cuda:1
 epochs: 100
+num_batch: 64
+num_data: 4096
 seed: 42
 wandb: False
 
@@ -9,8 +9,9 @@ model:
   aggr: max
   dim: 64
   num_layers: 3
+  readout: sum
+  type: MPNN
 
 optimizer:
-  _target_: lion_pytorch.Lion
   lr: 1e-4
   weight_decay: 1e-2

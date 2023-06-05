@@ -217,15 +217,11 @@ def eval_data(cfg, process_num: int = 0):
 
 
 def train(cfg: dict):
-    date = datetime.now().strftime("%m%d_%H%M%S")
     seed_everything(cfg.seed)
+    date = datetime.now().strftime("%m%d_%H%M%S")
 
-    h_params = dict(
-        aggregator=cfg.model.aggr,
-        learning_rate=cfg.optimizer.lr,
-        weight_decay=cfg.optimizer.weight_decay
-    )
-
+    h_params = dict(gnn=cfg.model.type, gnn_aggregator=cfg.model.aggr,
+                    learning_rate=cfg.optimizer.lr, weight_decay=cfg.optimizer.weight_decay)
     config_dict = dict(yaml='../config/train.yaml', params=h_params)
 
     if cfg.wandb:
@@ -234,28 +230,25 @@ def train(cfg: dict):
                    name=date,
                    config=config_dict)
 
-    model = DestroyEdgewise(model=cfg.model,
-                            optimizer=cfg.optimizer,
-                            device=cfg.device)
+    model = DestroyEdgewise(cfg)
 
-    batch_size = h_params['batch_size']
-    data_idx = list(range(cfg.data_size))
+    batch_size = cfg.num_data // cfg.num_batch
+    data_idx = list(range(cfg.num_batch))
 
     for e in trange(cfg.epochs):
         random.shuffle(data_idx)
         epoch_loss = 0
 
-        for b in range(cfg.batch_num):
+        for b in range(cfg.num_batch):
             graphs, labels = [], []
 
             for d_id in data_idx[b * batch_size: (b + 1) * batch_size]:
                 with open('datas/train_data_32/train_data{}.pkl'.format(d_id), 'rb') as f:
                     graph, destroy = pickle.load(f)
-                    # (num_agent + num_task - num_node_per_destroy) * num_destroy -> (4 + 20 - 3) * 100
                     b = dgl.batch([dgl.node_subgraph(graph, list(set(range(graph.num_nodes())) - set(d_key)))
                                    for d_key in destroy.keys()])
                     graphs.append(b)
-                    labels.extend(list(destroy.values()))
+                    labels.append(list(destroy.values()))
                     # if cfg.method == 'topK':
                     #     destroy = dict(sorted(destroy.items(), key=lambda x: x[1]))
                     # elif cfg.method == 'randomK':
@@ -264,11 +257,12 @@ def train(cfg: dict):
                     #     random_key = random_key[:10]
                     #     destroy = dict(zip(random_key, [destroy[k] for k in random_key]))
             graphs = dgl.batch(graphs)
+            labels = torch.Tensor(labels) / 32
             batch_loss = model(graphs, labels)
             # temp = dgl.batch([dgl.node_subgraph(g, list(set(range(g.num_nodes())) - set(idx))) for idx in d.keys()])
             epoch_loss += batch_loss
 
-        epoch_loss /= cfg.batch_num
+        epoch_loss /= cfg.num_batch
 
         if cfg.wandb:
             wandb.log({'epoch_loss': epoch_loss})
