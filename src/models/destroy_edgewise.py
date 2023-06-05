@@ -123,6 +123,8 @@ class DestroyEdgewise(nn.Module):
         self.loss = nn.L1Loss()
         self.optimizer = Lion(self.parameters(), lr=lr, weight_decay=wd)
 
+        self.to(cfg.device)
+
     def forward(self, graphs: dgl.DGLGraph, y: torch.Tensor):
         # destroy_num = len(destroys[0])
         # nf = self.node_W(graphs.ndata['coord'])
