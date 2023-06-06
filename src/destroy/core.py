@@ -158,7 +158,7 @@ def eval_data(cfg: dict):
 
             temp_assign_idx[ag_idx].insert(ins_pos, re_ins)
             removal_idx.remove(re_ins)
-            assign_pos = [t_coord[schedule] for schedule in temp_assign_idx]
+            assign_pos = [np.array(t_coord)[schedule].tolist() for schedule in temp_assign_idx]
 
         cost, _, time_log = solver(grid, a_coord, assign_pos, ret_log=True,
                                    solver_dir=cfg.solver_dir, save_dir=cfg.save_dir, exp_name=str(eval_id))
@@ -232,19 +232,17 @@ def eval(cfg: dict):
     model.load_state_dict(torch.load(cfg.dir))
     model.eval()
 
-    eval_dir = 'datas/eval_data_64/'
-    map_index = list(range(len(os.listdir(eval_dir))))
-    random.shuffle(map_index)
-    map_index = map_index[:cfg.eval_num]
+    eval_dir = 'datas/eval_data_32/'
+    map_index = list(range(cfg.num_eval))
 
-    entire_model_perf = 0
-    entire_baseline_perf = 0
+    total_model_perf = 0
+    total_baseline_perf = 0
 
     for map_id in tqdm(map_index):
         solver_dir = os.path.join(Path(os.path.realpath(__file__)).parent.parent, 'PBS/pbs')
         save_dir = os.path.join(Path(os.path.realpath(__file__)).parent.parent, 'PBS/{}/'.
                                 format(datetime.now().strftime("%m%d_%H%M%S")))
-        lns_dir = [solver_dir, save_dir, 'eval_{}'.format(cfg.type), map_id]
+        lns_dir = [solver_dir, save_dir, 'eval', map_id]
 
         try:
             if not os.path.exists(lns_dir[1]):
@@ -252,120 +250,59 @@ def eval(cfg: dict):
         except OSError:
             print("Error: Cannot create the directory.")
 
-        # Load initial solution
         with open(eval_dir + 'eval_data{}.pkl'.format(map_id), 'rb') as f:
-            F = pickle.load(f)
-            info, graph = F[0], F[1]
-            graph = dgl.from_networkx(
-                graph,
-                node_attrs=['coord', 'type', 'idx', 'graph_id'],
-                edge_attrs=['dist', 'connected']
-            ).to(cfg.device)
-            graph.edata['dist'] = graph.edata['dist'].to(torch.float32)
-            lns = ((F[2] - F[-1]) / F[2]) * 100
+            grid, map_graph, a_coord, t_coord, \
+            assign_idx, assign_coord, schedule, sch_graph, init_cost, lns_cost = pickle.load(f)
 
-        " LNS procedure "
-        assign_idx, assign_pos = info['lns']
-        pre_cost = info['init_cost']
-        results = [pre_cost]
+        temp_assign_idx = copy.deepcopy(assign_idx)
+        temp_graph = copy.deepcopy(sch_graph).to(cfg.device)
+        num_tasks = (temp_graph.ndata['type'] == 2).sum().item()
+        destroys = [c for c in combinations(range(num_tasks), 3)]
+        candidates = random.sample(destroys, cfg.cand_size)
+        removal_idx = model.act(temp_graph, candidates)
 
-        for _ in range(100):
-            if cfg.type == 'neural':
-                temp_assign_idx = copy.deepcopy(assign_idx)
-                temp_graph = copy.deepcopy(graph)
-                num_tasks = (temp_graph.ndata['type'] == 2).sum().item()
-                destroys = [c for c in combinations(range(num_tasks), 3)]
-                candidates = random.sample(destroys, cfg.cand_size)
-                removal_idx = model.act(temp_graph, candidates)
+        removed = [False for _ in removal_idx]
+        for schedule in temp_assign_idx:
+            for i, r in enumerate(removal_idx):
+                if removed[i]:
+                    continue
+                if r in schedule:
+                    schedule.remove(r)
+                    removed[i] = True
 
-            elif cfg.type == 'heuristic':
-                time_log = None
-                temp_assign_idx = copy.deepcopy(assign_idx)
-                removal_idx = removal(
-                    assign_idx,
-                    info['tasks'],
-                    info['graph'],
-                    N=2,
-                    time_log=time_log
-                )
-                if removal_idx == 'stop':
-                    return 'stop'
+        while len(removal_idx) != 0:
+            f_val = f_ijk(a_coord, t_coord, temp_assign_idx, removal_idx)
 
-            removed = [False for _ in removal_idx]
-            for schedule in temp_assign_idx:
-                for i, r in enumerate(removal_idx):
-                    if removed[i]:
-                        continue
-                    if r in schedule:
-                        schedule.remove(r)
-                        removed[i] = True
+            # get min regret
+            regrets = np.stack(list(f_val.values()))
+            argmin_regret = np.argmin(regrets, axis=None)
+            min_regret_idx = np.unravel_index(argmin_regret, regrets.shape)
 
-            while len(removal_idx) != 0:
-                f_val = f_ijk(temp_assign_idx, info['agents'], removal_idx, info['tasks'], info['graph'])
+            r_idx, insertion_edge_idx = min_regret_idx
+            re_ins = removal_idx[r_idx]
 
-                # get min regret
-                regrets = np.stack(list(f_val.values()))
-                argmin_regret = np.argmin(regrets, axis=None)
-                min_regret_idx = np.unravel_index(argmin_regret, regrets.shape)
+            # get insertion agent index and location
+            ag_idx = 0
+            while True:
+                ag_schedule = assign_idx[ag_idx]
+                if insertion_edge_idx - (len(ag_schedule) + 1) < 0:
+                    ins_pos = insertion_edge_idx
+                    break
+                else:
+                    insertion_edge_idx -= (len(ag_schedule) + 1)
+                    ag_idx += 1
 
-                r_idx, insertion_edge_idx = min_regret_idx
-                re_ins = removal_idx[r_idx]
+            temp_assign_idx[ag_idx].insert(ins_pos, re_ins)
+            removal_idx.remove(re_ins)
+            assign_pos = [np.array(t_coord)[schedule].tolist() for schedule in temp_assign_idx]
 
-                # get insertion agent index and location
-                ag_idx = 0
-                while True:
-                    ag_schedule = assign_idx[ag_idx]
-                    if insertion_edge_idx - (len(ag_schedule) + 1) < 0:
-                        ins_pos = insertion_edge_idx
-                        break
-                    else:
-                        insertion_edge_idx -= (len(ag_schedule) + 1)
-                        ag_idx += 1
+            cost, _, time_log = solver(grid, a_coord, assign_pos, ret_log=True,
+                                       solver_dir=cfg.solver_dir, save_dir=cfg.save_dir, exp_name='eval')
 
-                temp_assign_idx[ag_idx].insert(ins_pos, re_ins)
-                removal_idx.remove(re_ins)
-
-                assign_pos = [np.array(info['tasks'])[schedule].tolist() for schedule in temp_assign_idx]
-
-                cost, _, time_log = solver(
-                    info['grid'],
-                    info['agents'],
-                    assign_pos,
-                    ret_log=True,
-                    solver_dir=cfg.solver_dir,
-                    save_dir=cfg.save_dir,
-                    exp_name='eval'
-                )
-
-            if cost == 'error':
-                pass
-
-            else:
-                if cost < pre_cost:
-                    pre_cost = cost
-                    assign_idx = temp_assign_idx
-                    results.append(pre_cost)
-                    if cfg.type == 'neural':
-                        coordination = [[a.tolist()] + t for a, t in zip(info['agents'], assign_pos)]
-                        next_nx_graph = sch_to_dgl(assign_idx, coordination, info['grid'].shape[0])
-                        next_graph = dgl.from_networkx(
-                            next_nx_graph,
-                            node_attrs=['coord', 'type', 'idx', 'graph_id'],
-                            edge_attrs=['dist', 'connected']
-                        ).to(cfg.device)
-                        next_graph.edata['dist'] = next_graph.edata['dist'].to(torch.float32)
-                        graph = next_graph
-                    elif cfg.type == 'heuristic':
-                        pass
-                    else:
-                        raise NotImplementedError('EVALUATION SUPPORTS NEURAL OR HEURISTIC ONLY')
-
-                elif cost >= pre_cost:
-                    results.append(pre_cost)
-
-        each_map_perf = (results[0] - results[-1]) / results[0]
-        entire_model_perf += each_map_perf
-        entire_baseline_perf += lns
+        model_perf = (init_cost - cost) / init_cost * 100
+        baseline_perf = (init_cost - lns_cost) / init_cost * 100
+        total_model_perf += model_perf
+        total_baseline_perf += baseline_perf
 
         try:
             if os.path.exists(lns_dir[1]):
@@ -373,7 +310,8 @@ def eval(cfg: dict):
         except OSError:
             print("Error: Cannot remove the directory.")
 
-    print(entire_model_perf / cfg.eval_num, entire_baseline_perf / cfg.eval_num)
+    print('Model Performance: {:.4f} || Model Performance: {:.4f}'
+          .format(total_model_perf / cfg.num_eval, total_baseline_perf / cfg.num_eval))
 
 
 # def test_destroy(cfg: dict):

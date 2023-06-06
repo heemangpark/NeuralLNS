@@ -1,11 +1,10 @@
 cand_size: 10
-device: cuda:1
+device: cuda:2
 dir: datas/trained/models/0605_200034/100.pt
-eval_num: 100
+num_eval: 2000
 seed: 42
-type: neural  # neural, heuristic
-solver_dir: PBS/pbs
 save_dir: PBS/eval
+solver_dir: PBS/pbs
 
 model:
   aggr: max
