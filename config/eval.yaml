@@ -1,6 +1,6 @@
 cand_size: 10
 device: cuda:1
-dir: datas/trained/models/0605_173035/20.pt
+dir: datas/trained/models/0605_200034/100.pt
 eval_num: 100
 seed: 42
 type: neural  # neural, heuristic
@@ -9,9 +9,10 @@ save_dir: PBS/eval
 
 model:
   aggr: max
+  delta: 1
   dim: 64
   num_layers: 3
-  readout: mean
+  readout: sum
   type: MPNN
 
 optimizer:

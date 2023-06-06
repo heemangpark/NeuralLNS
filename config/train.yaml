@@ -3,11 +3,11 @@ epochs: 100
 num_batch: 64
 num_data: 4096
 seed: 42
-wandb: False
+wandb: True
 
 model:
   aggr: max
-  delta: 10
+  delta: 1
   dim: 64
   num_layers: 3
   readout: sum

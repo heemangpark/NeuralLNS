@@ -19,7 +19,6 @@ from src.heuristics.hungarian import hungarian
 from src.heuristics.regret import f_ijk
 from src.heuristics.shaw import removal
 from src.models.destroy_edgewise import DestroyEdgewise
-from src.models.destroy_edgewise import TestDestroy
 from utils.graph import sch_to_dgl
 from utils.scenario import load_scenarios
 from utils.seed import seed_everything
@@ -106,114 +105,67 @@ def train_data(cfg: dict):
             pickle.dump(total_data, f)
 
 
-def eval_data(cfg, process_num: int = 0):
+def eval_data(cfg: dict):
     seed_everything(cfg.seed)
-    num_data_per_process = cfg.num_data // cfg.n_processes
-    if process_num == 0:
-        exp_num_range = trange(num_data_per_process * process_num, num_data_per_process * (process_num + 1))
-    else:
-        exp_num_range = range(num_data_per_process * process_num, num_data_per_process * (process_num + 1))
+    for eval_id in trange(cfg.num_data):
+        grid, map_graph, a_coord, t_coord = load_scenarios('{}{}{}_{}_{}_eval/scenario_{}.pkl'
+                                                           .format(cfg.map_size, cfg.map_size, cfg.obs_ratio,
+                                                                   cfg.num_agent, cfg.num_task, eval_id))
+        assign_idx, assign_coord = hungarian(a_coord, t_coord)
+        schedule = [[a] + t for a, t in zip(a_coord, assign_coord)]
+        sch_graph = sch_to_dgl(assign_idx, schedule, grid.shape[0])
 
-    for exp_num in exp_num_range:
-        scenario = load_scenarios('{}{}{}_{}_{}_eval/scenario_{}.pkl'
-                                  .format(cfg.map_size, cfg.map_size,
-                                          cfg.obs_ratio,
-                                          cfg.num_agent,
-                                          cfg.num_task,
-                                          exp_num))
+        init_cost, _, time_log = solver(grid, a_coord, assign_coord,
+                                        solver_dir=cfg.solver_dir, save_dir=cfg.save_dir, exp_name='init', ret_log=True)
+        if init_cost == 'error':
+            return 'abandon_seed'
 
-        info = {'grid': scenario[0], 'graph': scenario[1], 'agents': scenario[2],
-                'tasks': [t[0] for t in scenario[3]]}
-        assign_id, assign_pos = hungarian(info['graph'], info['agents'], info['tasks'])
-        info['lns'] = assign_id, assign_pos
+        temp_assign_idx = copy.deepcopy(assign_idx)
+        removal_idx = removal(assign_idx, t_coord, map_graph, N=2, time_log=time_log)
+        if removal_idx == 'stop':
+            return 'stop'
 
-        coordination = [[a.tolist()] + t for a, t in zip(info['agents'], assign_pos)]
-        init_graph = sch_to_dgl(assign_id, coordination, info['grid'].shape[0])
-        info['init_cost'], _, time_log = solver(
-            info['grid'],
-            info['agents'],
-            assign_pos,
-            solver_dir=cfg.solver_dir,
-            save_dir=cfg.save_dir,
-            exp_name='init',
-            ret_log=True)
-        if info['init_cost'] == 'error':
-            return 'abandon_cfg.seed'
+        removed = [False for _ in removal_idx]
+        for schedule in temp_assign_idx:
+            for i, r in enumerate(removal_idx):
+                if removed[i]:
+                    continue
+                if r in schedule:
+                    schedule.remove(r)
+                    removed[i] = True
 
-        assign_idx, assign_pos = info['lns']
-        pre_cost = info['init_cost']
+        while len(removal_idx) != 0:
+            f_val = f_ijk(a_coord, t_coord, temp_assign_idx, removal_idx)
 
-        data = [info, init_graph]
+            # get min regret
+            regrets = np.stack(list(f_val.values()))
+            argmin_regret = np.argmin(regrets, axis=None)
+            min_regret_idx = np.unravel_index(argmin_regret, regrets.shape)
 
-        for _ in range(100):
-            temp_assign_idx = copy.deepcopy(assign_idx)
-            removal_idx = removal(
-                assign_idx,
-                info['tasks'],
-                info['graph'],
-                N=2,
-                time_log=time_log
-            )
-            if removal_idx == 'stop':
-                return 'stop'
+            r_idx, insertion_edge_idx = min_regret_idx
+            re_ins = removal_idx[r_idx]
 
-            # remove 'removal_idx'
-            removed = [False for _ in removal_idx]
-            for schedule in temp_assign_idx:
-                for i, r in enumerate(removal_idx):
-                    if removed[i]:
-                        continue
-                    if r in schedule:
-                        schedule.remove(r)
-                        removed[i] = True
+            # get insertion agent index and location
+            ag_idx = 0
+            while True:
+                ag_schedule = assign_idx[ag_idx]
+                if insertion_edge_idx - (len(ag_schedule) + 1) < 0:
+                    ins_pos = insertion_edge_idx
+                    break
+                else:
+                    insertion_edge_idx -= (len(ag_schedule) + 1)
+                    ag_idx += 1
 
-            while len(removal_idx) != 0:
-                f_val = f_ijk(temp_assign_idx, info['agents'], removal_idx, info['tasks'], info['graph'])
+            temp_assign_idx[ag_idx].insert(ins_pos, re_ins)
+            removal_idx.remove(re_ins)
+            assign_pos = [t_coord[schedule] for schedule in temp_assign_idx]
 
-                # get min regret
-                regrets = np.stack(list(f_val.values()))
-                argmin_regret = np.argmin(regrets, axis=None)
-                min_regret_idx = np.unravel_index(argmin_regret, regrets.shape)
+        cost, _, time_log = solver(grid, a_coord, assign_pos, ret_log=True,
+                                   solver_dir=cfg.solver_dir, save_dir=cfg.save_dir, exp_name=str(eval_id))
 
-                r_idx, insertion_edge_idx = min_regret_idx
-                re_ins = removal_idx[r_idx]
-
-                # get insertion agent index and location
-                ag_idx = 0
-                while True:
-                    ag_schedule = assign_idx[ag_idx]
-                    if insertion_edge_idx - (len(ag_schedule) + 1) < 0:
-                        ins_pos = insertion_edge_idx
-                        break
-                    else:
-                        insertion_edge_idx -= (len(ag_schedule) + 1)
-                        ag_idx += 1
-
-                temp_assign_idx[ag_idx].insert(ins_pos, re_ins)
-                removal_idx.remove(re_ins)
-
-                assign_pos = [np.array(info['tasks'])[schedule].tolist() for schedule in temp_assign_idx]
-
-                cost, _, time_log = solver(
-                    info['grid'],
-                    info['agents'],
-                    assign_pos,
-                    ret_log=True,
-                    solver_dir=cfg.solver_dir,
-                    save_dir=cfg.save_dir,
-                    exp_name=str(exp_num)
-                )
-
-            if cost == 'error':
-                pass
-            else:
-                if cost < pre_cost:
-                    pre_cost = cost
-                    assign_idx = temp_assign_idx
-            data.append(pre_cost)
-
-        with open('datas/eval_data/eval_data_{}_{}.pkl'.format(cfg.map_size, exp_num), 'wb') as f:
-            pickle.dump(data, f)
+        with open('datas/eval_data_{}/eval_data{}.pkl'.format(cfg.map_size, eval_id), 'wb') as f:
+            pickle.dump([grid, map_graph, a_coord, t_coord,
+                         assign_idx, assign_coord, schedule, sch_graph, init_cost, cost], f)
 
 
 def train(cfg: dict):
@@ -325,7 +277,6 @@ def eval(cfg: dict):
                 destroys = [c for c in combinations(range(num_tasks), 3)]
                 candidates = random.sample(destroys, cfg.cand_size)
                 removal_idx = model.act(temp_graph, candidates)
-                removal_idx = list(removal_idx)
 
             elif cfg.type == 'heuristic':
                 time_log = None
@@ -340,7 +291,6 @@ def eval(cfg: dict):
                 if removal_idx == 'stop':
                     return 'stop'
 
-            # remove 'removal_idx'
             removed = [False for _ in removal_idx]
             for schedule in temp_assign_idx:
                 for i, r in enumerate(removal_idx):
@@ -426,71 +376,71 @@ def eval(cfg: dict):
     print(entire_model_perf / cfg.eval_num, entire_baseline_perf / cfg.eval_num)
 
 
-def test_destroy(cfg: dict):
-    date = datetime.now().strftime("%m%d_%H%M%S")
-    seed_everything(cfg.seed)
-
-    hyperparameter_defaults = dict(
-        batch_size=cfg.data_size // cfg.batch_num,
-        aggregator=cfg.model.aggr,
-        learning_rate=cfg.optimizer.lr,
-        weight_decay=cfg.optimizer.weight_decay
-    )
-
-    config_dictionary = dict(
-        yaml='../config/test_destroy.yaml',
-        params=hyperparameter_defaults,
-    )
-
-    if cfg.wandb:
-        import wandb
-        wandb.init(project='NeuralLNS', name=date, config=config_dictionary)
-
-    model = TestDestroy(device=cfg.device,
-                        lr=cfg.optimizer.lr,
-                        weight_decay=cfg.optimizer.weight_decay,
-                        aggr=cfg.model.aggr)
-
-    train_size = int(cfg.data_size * .7)
-    eval_size = int(cfg.data_size * .3)
-
-    batch_size = cfg.data_size // cfg.batch_num
-    train_idx = list(range(cfg.data_size))
-    eval_idx = list(range(train_size, cfg.data_size))
-
-    for _ in trange(cfg.epochs):
-        random.shuffle(train_idx)
-        epoch_loss = 0
-
-        for b in range(cfg.batch_num):
-            batch_graphs, batch_target = [], []
-
-            for d_id in train_idx[b * batch_size: (b + 1) * batch_size]:
-                with open('datas/scenarios/test_destroy/{}.pkl'.format(d_id), 'rb') as f:
-                    graphs, targets = pickle.load(f)
-                batch_graphs.append(graphs)
-                batch_target.append(targets)
-
-            batch_graphs = dgl.batch(batch_graphs)
-            batch_loss = model(batch_graphs, batch_target)
-            epoch_loss += batch_loss
-
-        epoch_loss /= cfg.batch_num
-
-        if cfg.wandb:
-            wandb.log({'epoch_loss': epoch_loss})
-
-    torch.save(model.state_dict(), 'datas/trained/models/test_destroy.pt')
-
-    "evaluation"
-    model.eval()
-    score = 0
-    for e_id in tqdm(eval_idx):
-        with open('datas/scenarios/test_destroy/{}.pkl'.format(e_id), 'rb') as f:
-            graph, target = pickle.load(f)
-        y_hat = model._eval(graph).cpu()
-        score += torch.mean(torch.abs(y_hat - target.view(-1)[target.view(-1).nonzero()]))
-    print(score / eval_size)
+# def test_destroy(cfg: dict):
+#     date = datetime.now().strftime("%m%d_%H%M%S")
+#     seed_everything(cfg.seed)
+#
+#     hyperparameter_defaults = dict(
+#         batch_size=cfg.data_size // cfg.batch_num,
+#         aggregator=cfg.model.aggr,
+#         learning_rate=cfg.optimizer.lr,
+#         weight_decay=cfg.optimizer.weight_decay
+#     )
+#
+#     config_dictionary = dict(
+#         yaml='../config/test_destroy.yaml',
+#         params=hyperparameter_defaults,
+#     )
+#
+#     if cfg.wandb:
+#         import wandb
+#         wandb.init(project='NeuralLNS', name=date, config=config_dictionary)
+#
+#     model = TestDestroy(device=cfg.device,
+#                         lr=cfg.optimizer.lr,
+#                         weight_decay=cfg.optimizer.weight_decay,
+#                         aggr=cfg.model.aggr)
+#
+#     train_size = int(cfg.data_size * .7)
+#     eval_size = int(cfg.data_size * .3)
+#
+#     batch_size = cfg.data_size // cfg.batch_num
+#     train_idx = list(range(cfg.data_size))
+#     eval_idx = list(range(train_size, cfg.data_size))
+#
+#     for _ in trange(cfg.epochs):
+#         random.shuffle(train_idx)
+#         epoch_loss = 0
+#
+#         for b in range(cfg.batch_num):
+#             batch_graphs, batch_target = [], []
+#
+#             for d_id in train_idx[b * batch_size: (b + 1) * batch_size]:
+#                 with open('datas/scenarios/test_destroy/{}.pkl'.format(d_id), 'rb') as f:
+#                     graphs, targets = pickle.load(f)
+#                 batch_graphs.append(graphs)
+#                 batch_target.append(targets)
+#
+#             batch_graphs = dgl.batch(batch_graphs)
+#             batch_loss = model(batch_graphs, batch_target)
+#             epoch_loss += batch_loss
+#
+#         epoch_loss /= cfg.batch_num
+#
+#         if cfg.wandb:
+#             wandb.log({'epoch_loss': epoch_loss})
+#
+#     torch.save(model.state_dict(), 'datas/trained/models/test_destroy.pt')
+#
+#     "evaluation"
+#     model.eval()
+#     score = 0
+#     for e_id in tqdm(eval_idx):
+#         with open('datas/scenarios/test_destroy/{}.pkl'.format(e_id), 'rb') as f:
+#             graph, target = pickle.load(f)
+#         y_hat = model._eval(graph).cpu()
+#         score += torch.mean(torch.abs(y_hat - target.view(-1)[target.view(-1).nonzero()]))
+#     print(score / eval_size)
 
 
 def _getConfigPath(func):
