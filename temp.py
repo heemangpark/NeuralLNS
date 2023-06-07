@@ -30,8 +30,7 @@ def temp(cfg: dict):
                                                   cfg.num_agent, cfg.num_task, exp_id))
         assign_idx, assign_coord = hungarian(a_coord, t_coord)
 
-        actual_init_cost, _ = solver(grid, a_coord, assign_coord,
-                                     solver_dir=cfg.solver_dir, save_dir=cfg.save_dir, exp_name=str(exp_id))
+        actual_init_cost, _ = solver(grid, a_coord, assign_coord, save_dir=cfg.save_dir, exp_name=str(exp_id))
         est_init_cost = sum([sum(t) for t in [[abs(a[0] - b[0]) + abs(a[1] - b[1]) for a, b, in zip(sch[:-1], sch[1:])]
                                               for sch in assign_coord]])
 
@@ -75,8 +74,7 @@ def temp(cfg: dict):
                 prev_cost = est_cost
                 assign_idx = temp_assign_idx
 
-        actual_final_cost, _ = solver(grid, a_coord, assign_coord,
-                                      solver_dir=cfg.solver_dir, save_dir=cfg.save_dir, exp_name='temp')
+        actual_final_cost, _ = solver(grid, a_coord, assign_coord, save_dir=cfg.save_dir, exp_name='temp')
         if os.path.exists(cfg.save_dir):
             shutil.rmtree(cfg.save_dir)
 
