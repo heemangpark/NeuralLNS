@@ -86,27 +86,6 @@ def destroyBatchGraph(graphs: list, destroy, device=None):
     return batched_g
 
 
-# class MLP(nn.Module):
-#     def __init__(self, input_size=64, hidden_size=32):
-#         super(MLP, self).__init__()
-#
-#         self.linear = nn.Sequential(
-#             nn.Linear(input_size, hidden_size),
-#             nn.LeakyReLU(),
-#             nn.Linear(hidden_size, 1)
-#         )
-#
-#         self.softmax = nn.Softmax(dim=-1)
-#
-#     def forward(self, input):
-#         x = self.linear(input)
-#         x = x.squeeze()
-#         x = torch.sum(x, -1)
-#         x = self.softmax(x)
-#
-#         return x
-
-
 class DestroyEdgewise(nn.Module):
     def __init__(self, cfg: dict):
         super(DestroyEdgewise, self).__init__()
@@ -139,7 +118,6 @@ class DestroyEdgewise(nn.Module):
         #     destroy_list.extend(list(destroys[0].keys()))
         # destroyedGraph = destroyBatchGraph(gs_to_destroy, destroy_list, device)
         #
-        # # TODO: time
         # des_src, des_dst = [], []
         # node_cnt = 0
         # for i, dg in enumerate(dgl.unbatch(destroyedGraph)):
@@ -188,67 +166,3 @@ class DestroyEdgewise(nn.Module):
         pred = self.Why(h)
 
         return list(candidates[torch.argmax(pred).item()])
-
-# class TestDestroy(nn.Module):
-#     def __init__(self,
-#                  emb_dim: int = 64,
-#                  gnn_layers: int = 3,
-#                  device: str = 'cuda:1',
-#                  lr: float = 1e-4,
-#                  weight_decay: float = 1e-2,
-#                  aggr: str = 'min'):
-#         super(TestDestroy, self).__init__()
-#
-#         self.device = device
-#         self.embedding_dim = emb_dim
-#         self.node_W = nn.Linear(2, emb_dim)
-#         self.y_hat_W = nn.Linear(emb_dim, 1)
-#         self._get_edge_embedding = CompleteEdges(emb_dim * 2, emb_dim)
-#
-#         self.gnn = MPNN(
-#             in_dim=emb_dim,
-#             out_dim=emb_dim,
-#             embedding_dim=emb_dim,
-#             n_layers=gnn_layers,
-#             aggr=aggr,
-#             residual=True,
-#         )
-#
-#         self.optimizer = Lion(self.parameters(),
-#                               lr=lr,
-#                               weight_decay=weight_decay,
-#                               use_triton=True)
-#
-#         self.loss = nn.L1Loss()
-#
-#         self.to(device)
-#
-#     def forward(self, graphs, targets):
-#         graphs = graphs.to(self.device)
-#         nf = graphs.ndata['coord'].float().to(self.device)
-#         nf = self.node_W(nf)
-#
-#         x = self.gnn(graphs, nf)
-#         y_hat = self._get_edge_embedding(graphs, x)
-#         y_hat = self.y_hat_W(y_hat).view(-1)
-#
-#         y = [y.view(-1)[y.view(-1).nonzero(as_tuple=True)[0]].to(self.device) for y in targets]
-#         y = torch.cat(y)
-#
-#         loss = self.loss(y_hat, y)
-#         self.optimizer.zero_grad()
-#         loss.backward()
-#         self.optimizer.step()
-#
-#         return loss.item()
-#
-#     def _eval(self, graphs):
-#         graphs = graphs.to(self.device)
-#         nf = graphs.ndata['coord'].float().to(self.device)
-#         nf = self.node_W(nf)
-#
-#         x = self.gnn(graphs, nf)
-#         y_hat = self._get_edge_embedding(graphs, x)
-#         y_hat = self.y_hat_W(y_hat)
-#
-#         return y_hat
