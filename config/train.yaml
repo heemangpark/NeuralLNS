@@ -1,7 +1,8 @@
-batch_size: 64
+batch_size: 10
 device: cuda:3
 epochs: 100
-num_data: 8192
+num_train: 100
+num_val: 2000
 seed: 42
 wandb: False
 
@@ -10,7 +11,7 @@ model:
   delta: 1
   dim: 64
   num_layers: 3
-  readout: sum
+  readout: mean
   type: MPNN
 
 optimizer:

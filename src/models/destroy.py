@@ -166,3 +166,14 @@ class Destroy(nn.Module):
         pred = self.Why(h)
 
         return list(candidates[torch.argmax(pred).item()])
+
+    def val(self, graph: dgl.DGLHeteroGraph, candidates: list):
+        b = len(candidates)
+        graphs = dgl.batch([dgl.node_subgraph(graph, list(set(range(graph.num_nodes())) - set(c))) for c in candidates])
+        x = graphs.ndata['coord']
+        z = self.Wxz(x)
+        z_p = self.gnn(graphs, z).view(b, -1, z.shape[-1])
+        h = self.readout(z_p, dim=1)
+        pred = self.Why(h)
+
+        return pred.squeeze().tolist()

@@ -12,6 +12,7 @@ import dgl
 import numpy as np
 import torch
 import wandb
+from matplotlib import pyplot as plt
 from omegaconf import OmegaConf
 from tqdm import trange, tqdm
 
@@ -181,39 +182,53 @@ def train(cfg: dict):
         wandb.init(project='NeuralLNS', name=date, config=config_dict)
 
     model = Destroy(cfg)
-    data_idx = list(range(cfg.num_data))
+    train_idx = list(range(cfg.num_train))
 
     for e in trange(cfg.epochs):
-        random.shuffle(data_idx)
+        random.shuffle(train_idx)
         epoch_loss = 0
 
-        for b_id in range(cfg.num_data // cfg.batch_size):
+        for b_id in range(cfg.num_train // cfg.batch_size):
             graphs, labels = [], []
 
-            for d_id in data_idx[b_id * cfg.batch_size: (b_id + 1) * cfg.batch_size]:
-                with open('datas/32/train/train_data_{}.pkl'.format(d_id), 'rb') as f:
+            for t_id in train_idx[b_id * cfg.batch_size: (b_id + 1) * cfg.batch_size]:
+                with open('datas/32/train/{}.pkl'.format(t_id), 'rb') as f:
                     graph, destroy = pickle.load(f)
                     g = dgl.batch([dgl.node_subgraph(graph, list(set(range(graph.num_nodes())) - set(d_key)))
                                    for d_key in destroy.keys()])
                     graphs.append(g)
-                    labels.append(list(destroy.values()))
+                    labels.append(list(map(lambda x: x / 32, list(destroy.values()))))
 
             graphs = dgl.batch(graphs).to(cfg.device)
-            labels = (torch.Tensor(labels) / 32).to(cfg.device)
+            labels = torch.Tensor(labels).to(cfg.device)
 
             batch_loss = model(graphs, labels)
             epoch_loss += batch_loss
 
-        epoch_loss /= (cfg.num_data // cfg.batch_size)
+        epoch_loss /= (cfg.num_train // cfg.batch_size)
 
         if cfg.wandb:
             wandb.log({'epoch_loss': epoch_loss})
 
-        if (e + 1) % 10 == 0:
+        if (e % 10 == 0) or (e == cfg.epochs):
             dir = 'datas/models/{}/'.format(date)
             if not os.path.exists(dir):
                 os.makedirs(dir)
-            torch.save(model.state_dict(), dir + '{}.pt'.format(e + 1))
+            torch.save(model.state_dict(), dir + '{}.pt'.format(e))
+
+            # TODO: validation code (plot y_hat, y)
+            temp = Destroy(cfg)
+            temp.load_state_dict(torch.load(dir + '{}.pt'.format(e)))
+            temp.eval()
+            for v_id in list(range(5)):
+                with open('datas/32/val/{}.pkl'.format(v_id), 'rb') as f:
+                    g, d = pickle.load(f)
+                    y = list(map(lambda x: x / 32, list(d.values())))
+                y_hat = temp.val(g.to(cfg.device), d)
+                plt.plot(y, color='red')
+                plt.plot(y_hat, color='blue')
+                plt.savefig(dir + '{}_pt_val_{}.png'.format(e, v_id))
+                plt.clf()
 
 
 def eval(cfg: dict):
