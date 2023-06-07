@@ -3,6 +3,6 @@ num_agent: 4
 num_data: 2000
 num_task: 20
 obs_ratio: 20
-save_dir: PBS/eval_data
+save_dir: PBS/eval_data/
 seed: 24
-solver_dir: PBS/pbs
+solver_dir: PBS/pbs/
