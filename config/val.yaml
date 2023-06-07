@@ -1,6 +1,6 @@
 batch_size: 100
 device: cuda:3
-dir: datas/models/0607_154644/
+dir: datas/models/
 model_ver: 60
 num_val: 2000
 seed: 42

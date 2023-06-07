@@ -85,20 +85,13 @@ def train_data(cfg: dict):
 
                 assign_coord = [np.array(t_coord)[schedule].tolist() for schedule in temp_assign_idx]
 
-                cost, _, time_log = solver(
-                    grid,
-                    a_coord,
-                    assign_coord,
-                    solver_dir=cfg.solver_dir,
-                    save_dir=cfg.save_dir,
-                    exp_name=str(exp_num),
-                    ret_log=True
-                )
+                cost, _, time_log = solver(grid, a_coord, assign_coord, ret_log=True,
+                                           solver_dir=cfg.solver_dir, save_dir=cfg.save_dir, exp_name=str(exp_num))
 
             if cost == 'error':
                 pass
             else:
-                decrement = init_cost - cost  # decrement
+                decrement = init_cost - cost
                 cost_dict[D] = decrement
 
         total_data = [sch_graph, cost_dict]
@@ -122,7 +115,7 @@ def eval_data(cfg: dict):
             return 'abandon_seed'
 
         temp_assign_idx = copy.deepcopy(assign_idx)
-        removal_idx = removal(assign_idx, t_coord, map_graph, N=2, time_log=time_log)
+        removal_idx = removal(assign_idx, t_coord, N=2, time_log=time_log)
         if removal_idx == 'stop':
             return 'stop'
 
@@ -217,69 +210,64 @@ def train(cfg: dict):
                 os.makedirs(dir)
             torch.save(model.state_dict(), dir + '{}.pt'.format(e))
 
-            temp = Destroy(cfg)
-            temp.load_state_dict(torch.load(dir + '{}.pt'.format(e)))
-            temp.eval()
+            if cfg.val:
+                temp = Destroy(cfg)
+                temp.load_state_dict(torch.load(dir + '{}.pt'.format(e)))
+                temp.eval()
 
-            val_idx = list(range(cfg.num_val))
-            random.shuffle(val_idx)
+                val_idx = list(range(cfg.num_val))
+                random.shuffle(val_idx)
 
-            res = []
-            for b_id in range(cfg.num_val // cfg.batch_size):
-                graphs, y = [], []
+                res = []
+                for b_id in range(cfg.num_val // cfg.batch_size):
+                    graphs, y = [], []
 
-                for v_id in val_idx[b_id * cfg.batch_size: (b_id + 1) * cfg.batch_size]:
-                    with open('datas/32/val/{}.pkl'.format(v_id), 'rb') as f:
-                        g, d = pickle.load(f)
-                        d_sorted = sorted(d.items(), key=lambda x: x[1], reverse=True)
-                        d = dict((d_sorted[0], d_sorted[-1]))
-                        g = dgl.batch([dgl.node_subgraph(g, list(set(range(g.num_nodes())) - set(d_key)))
-                                       for d_key in d.keys()])
-                        graphs.append(g)
-                        y.append(list(map(lambda x: x / 32, list(d.values()))))
+                    for v_id in val_idx[b_id * cfg.batch_size: (b_id + 1) * cfg.batch_size]:
+                        with open('datas/32/val/{}.pkl'.format(v_id), 'rb') as f:
+                            g, d = pickle.load(f)
+                            d_sorted = sorted(d.items(), key=lambda x: x[1], reverse=True)
+                            d = dict((d_sorted[0], d_sorted[-1]))
+                            g = dgl.batch([dgl.node_subgraph(g, list(set(range(g.num_nodes())) - set(d_key)))
+                                           for d_key in d.keys()])
+                            graphs.append(g)
+                            y.append(list(map(lambda x: x / 32, list(d.values()))))
 
-                graphs = dgl.batch(graphs).to(cfg.device)
-                y = torch.Tensor(y).to(cfg.device)
-                res.append(temp.val(graphs, y))
+                    graphs = dgl.batch(graphs).to(cfg.device)
+                    y = torch.Tensor(y).to(cfg.device)
+                    res.append(temp.val(graphs, y))
 
-            if cfg.wandb:
-                wandb.log({'val': np.mean(res)})
+                if cfg.wandb:
+                    wandb.log({'val': np.mean(res)})
 
 
-# def val(cfg: dict):
-#     seed_everything(cfg.seed)
-#     model = Destroy(cfg)
-#     model.load_state_dict(torch.load(cfg.dir + '{}.pt'.format(cfg.model_ver)))
-#     model.eval()
-#
-#     val_idx = list(range(cfg.num_val))
-#     random.shuffle(val_idx)
-#
-#     res = []
-#     for b_id in trange(cfg.num_val // cfg.batch_size):
-#         graphs, y = [], []
-#
-#         for v_id in val_idx[b_id * cfg.batch_size: (b_id + 1) * cfg.batch_size]:
-#             with open('datas/32/val/{}.pkl'.format(v_id), 'rb') as f:
-#                 g, d = pickle.load(f)
-#                 d_sorted = sorted(d.items(), key=lambda x: x[1], reverse=True)
-#                 d = dict((d_sorted[0], d_sorted[-1]))
-#                 g = dgl.batch([dgl.node_subgraph(g, list(set(range(g.num_nodes())) - set(d_key)))
-#                                for d_key in d.keys()])
-#                 graphs.append(g)
-#                 y.append(list(map(lambda x: x / 32, list(d.values()))))
-#
-#         graphs = dgl.batch(graphs).to(cfg.device)
-#         y = torch.Tensor(y).to(cfg.device)
-#         res.append(model.val(graphs, y))
-#
-#     print('{:.4f}'.format(np.mean(res)))
-#
-#     # plt.scatter(y, y_hat)
-#     # plt.xlabel('y')
-#     # plt.ylabel('y_hat')
-#     # plt.savefig(cfg.dir + 'val_{}_{}.png'.format(cfg.model_ver, b_id))
-#     # plt.clf()
+def val(cfg: dict):
+    seed_everything(cfg.seed)
+    model = Destroy(cfg)
+    model.load_state_dict(torch.load(cfg.dir + '{}.pt'.format(cfg.model_ver)))
+    model.eval()
+
+    val_idx = list(range(cfg.num_val))
+    random.shuffle(val_idx)
+
+    res = []
+    for b_id in trange(cfg.num_val // cfg.batch_size):
+        graphs, y = [], []
+
+        for v_id in val_idx[b_id * cfg.batch_size: (b_id + 1) * cfg.batch_size]:
+            with open('datas/32/val/{}.pkl'.format(v_id), 'rb') as f:
+                g, d = pickle.load(f)
+                d_sorted = sorted(d.items(), key=lambda x: x[1], reverse=True)
+                d = dict((d_sorted[0], d_sorted[-1]))
+                g = dgl.batch([dgl.node_subgraph(g, list(set(range(g.num_nodes())) - set(d_key)))
+                               for d_key in d.keys()])
+                graphs.append(g)
+                y.append(list(map(lambda x: x / 32, list(d.values()))))
+
+        graphs = dgl.batch(graphs).to(cfg.device)
+        y = torch.Tensor(y).to(cfg.device)
+        res.append(model.val(graphs, y))
+
+    print('{:.4f}'.format(np.mean(res)))
 
 
 def eval(cfg: dict):

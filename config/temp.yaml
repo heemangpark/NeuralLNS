@@ -1,4 +1,4 @@
-destroy_per_map: 100
+itrs: 100
 map_size: 32
 num_agent: 4
 num_data: 10000

@@ -4,6 +4,7 @@ epochs: 100
 num_train: 8000
 num_val: 2000
 seed: 42
+val: True
 wandb: True
 
 model:

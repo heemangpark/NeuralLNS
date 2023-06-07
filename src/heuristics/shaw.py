@@ -1,9 +1,11 @@
 import random
+
 import numpy as np
+
 from utils.astar import graph_astar
 
 
-def removal(tasks_idx, task_pos, graph, N=2, time_log=None, metric='man'):
+def removal(tasks_idx, task_pos, N=2, time_log=None, metric='man'):
     if time_log == 'stop':
         return 'stop'
 
