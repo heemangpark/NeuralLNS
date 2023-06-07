@@ -36,8 +36,7 @@ def train_data(cfg: dict):
         schedule = [[a] + t for a, t in zip(a_coord, assign_coord)]
         sch_graph = sch_to_dgl(assign_idx, schedule, grid.shape[0])
 
-        init_cost, _ = solver(grid, a_coord, assign_coord,
-                              solver_dir=cfg.solver_dir, save_dir=cfg.save_dir, exp_name='init')
+        init_cost, _ = solver(grid, a_coord, assign_coord, save_dir=cfg.save_dir, exp_name='init')
         if init_cost == 'error':
             return 'abandon_seed'
 
@@ -85,8 +84,8 @@ def train_data(cfg: dict):
 
                 assign_coord = [np.array(t_coord)[schedule].tolist() for schedule in temp_assign_idx]
 
-                cost, _, time_log = solver(grid, a_coord, assign_coord, ret_log=True,
-                                           solver_dir=cfg.solver_dir, save_dir=cfg.save_dir, exp_name=str(exp_num))
+                cost, _, time_log = solver(grid, a_coord, assign_coord,
+                                           save_dir=cfg.save_dir, exp_name=str(exp_num), ret_log=True)
 
             if cost == 'error':
                 pass
@@ -110,7 +109,7 @@ def eval_data(cfg: dict):
         sch_graph = sch_to_dgl(assign_idx, schedule, grid.shape[0])
 
         init_cost, _, time_log = solver(grid, a_coord, assign_coord,
-                                        solver_dir=cfg.solver_dir, save_dir=cfg.save_dir, exp_name='init', ret_log=True)
+                                        save_dir=cfg.save_dir, exp_name='init', ret_log=True)
         if init_cost == 'error':
             return 'abandon_seed'
 
@@ -154,8 +153,8 @@ def eval_data(cfg: dict):
             removal_idx.remove(re_ins)
             assign_pos = [np.array(t_coord)[schedule].tolist() for schedule in temp_assign_idx]
 
-        cost, _, time_log = solver(grid, a_coord, assign_pos, ret_log=True,
-                                   solver_dir=cfg.solver_dir, save_dir=cfg.save_dir, exp_name=str(eval_id))
+        cost, _, time_log = solver(grid, a_coord, assign_pos,
+                                   save_dir=cfg.save_dir, exp_name=str(eval_id), ret_log=True)
 
         with open('datas/eval_data_{}/eval_data{}.pkl'.format(cfg.map_size, eval_id), 'wb') as f:
             pickle.dump([grid, map_graph, a_coord, t_coord,
@@ -340,8 +339,8 @@ def eval(cfg: dict):
             removal_idx.remove(re_ins)
             assign_pos = [np.array(t_coord)[schedule].tolist() for schedule in temp_assign_idx]
 
-            cost, _, time_log = solver(grid, a_coord, assign_pos, ret_log=True,
-                                       solver_dir=cfg.solver_dir, save_dir=cfg.save_dir, exp_name='eval')
+            cost, _, time_log = solver(grid, a_coord, assign_pos,
+                                       save_dir=cfg.save_dir, exp_name='eval', ret_log=True)
 
         model_perf = (init_cost - cost) / init_cost * 100
         baseline_perf = (init_cost - lns_cost) / init_cost * 100

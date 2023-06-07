@@ -4,6 +4,5 @@ num_agent: 4
 num_data: 10000
 num_task: 20
 obs_ratio: 20
-save_dir: PBS/train/
+save_dir: PBS/temp/
 seed: 42
-solver_dir: PBS/pbs/

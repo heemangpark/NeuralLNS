@@ -4,7 +4,6 @@ dir: datas/models/
 num_eval: 2000
 seed: 42
 save_dir: PBS/eval/
-solver_dir: PBS/pbs/
 
 model:
   aggr: max

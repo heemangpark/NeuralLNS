@@ -6,4 +6,3 @@ num_task: 20
 obs_ratio: 20
 save_dir: PBS/train/
 seed: 42
-solver_dir: PBS/pbs/

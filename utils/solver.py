@@ -73,7 +73,7 @@ def to_solver(task_in_seq, assignment):
     return s_in_tasks
 
 
-def solver(map, agents, tasks, solver_dir, save_dir, exp_name, ret_log=False):
+def solver(map, agents, tasks, save_dir, exp_name, ret_log=False):
     time_log = dict()
     s_agents = copy.deepcopy(agents)
     todo = copy.deepcopy(tasks)
@@ -91,7 +91,7 @@ def solver(map, agents, tasks, solver_dir, save_dir, exp_name, ret_log=False):
         save_map(map, exp_name, save_dir)
         save_scenario(s_agents, s_tasks, exp_name, map.shape[0], map.shape[1], save_dir)
 
-        c = [solver_dir,
+        c = ['PBS/pbs',
              "-m",
              save_dir + exp_name + '.map',
              "-a",

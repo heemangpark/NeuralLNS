@@ -1,11 +1,13 @@
 import copy
 import os
+import random
+import shutil
 import sys
 
 import numpy as np
 from matplotlib import pyplot as plt
 from omegaconf import OmegaConf
-from tqdm import trange
+from tqdm import tqdm
 
 sys.path.append(os.path.dirname(os.path.abspath(os.path.dirname(__file__))))
 from src.heuristics.hungarian import hungarian
@@ -18,15 +20,18 @@ from utils.solver import solver
 
 def temp(cfg: dict):
     seed_everything(cfg.seed)
+    exp_idx = list(range(cfg.num_data))
+    random.shuffle(exp_idx)
+
     gap = []
-    for exp_num in trange(cfg.num_data):
+    for exp_id in tqdm(exp_idx[:1000]):
         grid, grid_graph, a_coord, t_coord = load_scenarios(
             '{}{}{}_{}_{}/scenario_{}.pkl'.format(cfg.map_size, cfg.map_size, cfg.obs_ratio,
-                                                  cfg.num_agent, cfg.num_task, exp_num))
+                                                  cfg.num_agent, cfg.num_task, exp_id))
         assign_idx, assign_coord = hungarian(a_coord, t_coord)
 
         actual_init_cost, _ = solver(grid, a_coord, assign_coord,
-                                     solver_dir=cfg.solver_dir, save_dir=cfg.save_dir, exp_name='temp')
+                                     solver_dir=cfg.solver_dir, save_dir=cfg.save_dir, exp_name=str(exp_id))
         est_init_cost = sum([sum(t) for t in [[abs(a[0] - b[0]) + abs(a[1] - b[1]) for a, b, in zip(sch[:-1], sch[1:])]
                                               for sch in assign_coord]])
 
@@ -72,6 +77,9 @@ def temp(cfg: dict):
 
         actual_final_cost, _ = solver(grid, a_coord, assign_coord,
                                       solver_dir=cfg.solver_dir, save_dir=cfg.save_dir, exp_name='temp')
+        if os.path.exists(cfg.save_dir):
+            shutil.rmtree(cfg.save_dir)
+
         perf = (actual_init_cost - actual_final_cost) / actual_init_cost * 100
         gap.append(perf)
 
