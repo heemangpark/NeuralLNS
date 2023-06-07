@@ -183,38 +183,30 @@ def train(cfg: dict):
                    config=config_dict)
 
     model = Destroy(cfg)
-
-    batch_size = cfg.num_data // cfg.num_batch
     data_idx = list(range(cfg.num_data))
 
     for e in trange(cfg.epochs):
         random.shuffle(data_idx)
         epoch_loss = 0
 
-        for b_id in range(cfg.num_batch):
+        for b_id in range(cfg.num_data // cfg.batch_size):
             graphs, labels = [], []
 
-            for d_id in data_idx[b_id * batch_size: (b_id + 1) * batch_size]:
+            for d_id in data_idx[b_id * cfg.batch_size: (b_id + 1) * cfg.batch_size]:
                 with open('datas/train_data_32/train_data{}.pkl'.format(d_id), 'rb') as f:
                     graph, destroy = pickle.load(f)
-                    b = dgl.batch([dgl.node_subgraph(graph, list(set(range(graph.num_nodes())) - set(d_key)))
+                    g = dgl.batch([dgl.node_subgraph(graph, list(set(range(graph.num_nodes())) - set(d_key)))
                                    for d_key in destroy.keys()])
-                    graphs.append(b)
+                    graphs.append(g)
                     labels.append(list(destroy.values()))
-                    # if cfg.method == 'topK':
-                    #     destroy = dict(sorted(destroy.items(), key=lambda x: x[1]))
-                    # elif cfg.method == 'randomK':
-                    #     random_key = list(destroy.keys())
-                    #     random.shuffle(random_key)
-                    #     random_key = random_key[:10]
-                    #     destroy = dict(zip(random_key, [destroy[k] for k in random_key]))
+
             graphs = dgl.batch(graphs).to(cfg.device)
             labels = (torch.Tensor(labels) / 32).to(cfg.device)
+
             batch_loss = model(graphs, labels)
-            # temp = dgl.batch([dgl.node_subgraph(g, list(set(range(g.num_nodes())) - set(idx))) for idx in d.keys()])
             epoch_loss += batch_loss
 
-        epoch_loss /= cfg.num_batch
+        epoch_loss /= (cfg.num_data // cfg.batch_size)
 
         if cfg.wandb:
             wandb.log({'epoch_loss': epoch_loss})

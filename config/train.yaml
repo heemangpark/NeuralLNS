@@ -1,9 +1,9 @@
-device: cuda:2
+batch_size: 64
+device: cuda:3
 epochs: 100
-num_batch: 64
-num_data: 4096
+num_data: 8192
 seed: 42
-wandb: True
+wandb: False
 
 model:
   aggr: max
