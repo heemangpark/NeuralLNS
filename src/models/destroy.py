@@ -143,8 +143,7 @@ class Destroy(nn.Module):
         # loss = torch.mean(-(cost - baseline) * torch.log(pred + 1e-5))
         # loss = torch.mean(-cost * torch.log(pred + 1e-5))
         b, k = target.shape
-        z = graphs.ndata['coord']
-        z = self.Wzz(z)
+        z = self.Wzz(graphs.ndata['coord'])
         graph_embedding = self.gnn(graphs, z).view(b, -1, k, z.shape[-1])
         h = self.readout(graph_embedding, dim=1)
         y_hat = self.Why(h).view(b, k)
@@ -158,6 +157,14 @@ class Destroy(nn.Module):
 
         return loss.item()
 
+    def val(self, graphs: dgl.DGLHeteroGraph, target: torch.Tensor):
+        b, k = target.shape
+        z = self.Wzz(graphs.ndata['coord'])
+        graph_embedding = self.gnn(graphs, z).view(b, -1, k, z.shape[-1])
+        h = self.readout(graph_embedding, dim=1)
+        pred = self.Why(h).view(b, k)
+        return (torch.sum(pred[:, 0] > pred[:, 1]) / pred.shape[0] * 100).item()
+
     def act(self, graph: dgl.DGLHeteroGraph, candidates: list):
         b = len(candidates)
         graphs = dgl.batch([dgl.node_subgraph(graph, list(set(range(graph.num_nodes())) - set(c))) for c in candidates])
@@ -168,12 +175,3 @@ class Destroy(nn.Module):
         pred = self.Why(h)
 
         return list(candidates[torch.argmax(pred).item()])
-
-    def val(self, graphs: dgl.DGLHeteroGraph):
-        x = graphs.ndata['coord']
-        z = self.Wxz(x)
-        z_p = self.gnn(graphs, z).view(2, -1, z.shape[-1])
-        h = self.readout(z_p, dim=1)
-        pred = self.Why(h)
-
-        return pred.squeeze().tolist()

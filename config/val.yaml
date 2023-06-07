@@ -1,10 +1,9 @@
 batch_size: 100
-device: cuda:0
-epochs: 100
-num_train: 8000
+device: cuda:3
+dir: datas/models/0607_154644/
+model_ver: 60
 num_val: 2000
 seed: 42
-wandb: True
 
 model:
   aggr: max
