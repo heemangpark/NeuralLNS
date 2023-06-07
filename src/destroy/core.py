@@ -18,7 +18,7 @@ sys.path.append(os.path.dirname(os.path.abspath(os.path.dirname(__file__))))
 from src.heuristics.hungarian import hungarian
 from src.heuristics.regret import f_ijk
 from src.heuristics.shaw import removal
-from src.models.destroy_edgewise import DestroyEdgewise
+from src.models.destroy import Destroy
 from utils.graph import sch_to_dgl
 from utils.scenario import load_scenarios
 from utils.seed import seed_everything
@@ -182,7 +182,7 @@ def train(cfg: dict):
                    name=date,
                    config=config_dict)
 
-    model = DestroyEdgewise(cfg)
+    model = Destroy(cfg)
 
     batch_size = cfg.num_data // cfg.num_batch
     data_idx = list(range(cfg.num_data))
@@ -228,7 +228,7 @@ def train(cfg: dict):
 
 def eval(cfg: dict):
     seed_everything(cfg.seed)
-    model = DestroyEdgewise(cfg)
+    model = Destroy(cfg)
     model.load_state_dict(torch.load(cfg.dir))
     model.eval()
 

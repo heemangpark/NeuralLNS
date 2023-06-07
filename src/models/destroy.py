@@ -86,9 +86,9 @@ def destroyBatchGraph(graphs: list, destroy, device=None):
     return batched_g
 
 
-class DestroyEdgewise(nn.Module):
+class Destroy(nn.Module):
     def __init__(self, cfg: dict):
-        super(DestroyEdgewise, self).__init__()
+        super(Destroy, self).__init__()
 
         aggr, delta, dim, num_layers, readout, _ = cfg.model.values()
         lr, wd = cfg.optimizer.values()
