@@ -12,7 +12,6 @@ import dgl
 import numpy as np
 import torch
 import wandb
-from matplotlib import pyplot as plt
 from omegaconf import OmegaConf
 from tqdm import trange, tqdm
 
@@ -194,6 +193,8 @@ def train(cfg: dict):
             for t_id in train_idx[b_id * cfg.batch_size: (b_id + 1) * cfg.batch_size]:
                 with open('datas/32/train/{}.pkl'.format(t_id), 'rb') as f:
                     graph, destroy = pickle.load(f)
+                    d_sorted = sorted(destroy.items(), key=lambda x: x[1], reverse=True)
+                    destroy = dict((d_sorted[0], d_sorted[-1]))
                     g = dgl.batch([dgl.node_subgraph(graph, list(set(range(graph.num_nodes())) - set(d_key)))
                                    for d_key in destroy.keys()])
                     graphs.append(g)
@@ -216,19 +217,25 @@ def train(cfg: dict):
                 os.makedirs(dir)
             torch.save(model.state_dict(), dir + '{}.pt'.format(e))
 
-            # TODO: validation code (plot y_hat, y)
-            temp = Destroy(cfg)
-            temp.load_state_dict(torch.load(dir + '{}.pt'.format(e)))
-            temp.eval()
-            for v_id in list(range(5)):
-                with open('datas/32/val/{}.pkl'.format(v_id), 'rb') as f:
-                    g, d = pickle.load(f)
-                    y = list(map(lambda x: x / 32, list(d.values())))
-                y_hat = temp.val(g.to(cfg.device), d)
-                plt.plot(y, color='red')
-                plt.plot(y_hat, color='blue')
-                plt.savefig(dir + '{}_pt_val_{}.png'.format(e, v_id))
-                plt.clf()
+            # temp = Destroy(cfg)
+            # temp.load_state_dict(torch.load(dir + '{}.pt'.format(e)))
+            # temp.eval()
+            # for v_id in list(range(10)):
+            #     y, y_hat = [], []
+            #     with open('datas/32/val/{}.pkl'.format(v_id), 'rb') as f:
+            #         g, d = pickle.load(f)
+            #         d_sorted = sorted(d.items(), key=lambda x: x[1], reverse=True)
+            #         d = dict((d_sorted[0], d_sorted[-1]))
+            #         g = dgl.batch([dgl.node_subgraph(g, list(set(range(g.num_nodes())) - set(d_key)))
+            #                        for d_key in d.keys()]).to(cfg.device)
+            #     y = list(map(lambda x: x / 32, list(d.values())))
+            #     y_hat = temp.val(g)
+            #     print(y, y_hat)
+            #     plt.scatter(y, y_hat)
+            #     plt.xlabel('y')
+            #     plt.ylabel('yhat')
+            #     plt.savefig(dir + '{}_pt_val_{}.png'.format(e, v_id))
+            #     plt.clf()
 
 
 def eval(cfg: dict):

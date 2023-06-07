@@ -96,15 +96,15 @@ class Destroy(nn.Module):
         self.gnn = MPNN(in_dim=dim, out_dim=dim, embedding_dim=dim, n_layers=num_layers,
                         aggr=aggr, delta=delta, residual=True)
         self.readout = getattr(torch, readout)
-        self.Wxz = nn.Linear(2, dim)
+        self.Wzz = nn.Linear(2, dim)
         self.Why = nn.Linear(dim, 1)
 
-        self.loss = nn.L1Loss()
+        self.loss = nn.MarginRankingLoss()
         self.optimizer = Lion(self.parameters(), lr=lr, weight_decay=wd)
 
         self.to(cfg.device)
 
-    def forward(self, graphs: dgl.DGLGraph, y: torch.Tensor):
+    def forward(self, graphs: dgl.DGLGraph, target: torch.Tensor):
         # destroy_num = len(destroys[0])
         # nf = self.node_W(graphs.ndata['coord'])
         # next_nf = self.gnn(graphs, nf)
@@ -142,14 +142,16 @@ class Destroy(nn.Module):
         # loss = self.loss(pred.log(), cost)
         # loss = torch.mean(-(cost - baseline) * torch.log(pred + 1e-5))
         # loss = torch.mean(-cost * torch.log(pred + 1e-5))
-        b, k = y.shape
-        x = graphs.ndata['coord']
-        z = self.Wxz(x)
-        z_p = self.gnn(graphs, z).view(b, -1, k, z.shape[-1])
-        h = self.readout(z_p, dim=1)
+        b, k = target.shape
+        z = graphs.ndata['coord']
+        z = self.Wzz(z)
+        graph_embedding = self.gnn(graphs, z).view(b, -1, k, z.shape[-1])
+        h = self.readout(graph_embedding, dim=1)
         y_hat = self.Why(h).view(b, k)
+        y_p, y_n = y_hat[:, 0], y_hat[:, 1]
+        y = torch.ones_like(y_p)
 
-        loss = self.loss(y_hat, y)
+        loss = self.loss(y_p, y_n, y)
         self.optimizer.zero_grad()
         loss.backward()
         self.optimizer.step()
@@ -167,12 +169,10 @@ class Destroy(nn.Module):
 
         return list(candidates[torch.argmax(pred).item()])
 
-    def val(self, graph: dgl.DGLHeteroGraph, candidates: list):
-        b = len(candidates)
-        graphs = dgl.batch([dgl.node_subgraph(graph, list(set(range(graph.num_nodes())) - set(c))) for c in candidates])
+    def val(self, graphs: dgl.DGLHeteroGraph):
         x = graphs.ndata['coord']
         z = self.Wxz(x)
-        z_p = self.gnn(graphs, z).view(b, -1, z.shape[-1])
+        z_p = self.gnn(graphs, z).view(2, -1, z.shape[-1])
         h = self.readout(z_p, dim=1)
         pred = self.Why(h)
 
