@@ -11,6 +11,7 @@ from pathlib import Path
 import dgl
 import numpy as np
 import torch
+import wandb
 from omegaconf import OmegaConf
 from tqdm import trange, tqdm
 
@@ -177,10 +178,7 @@ def train(cfg: dict):
     config_dict = dict(yaml='../config/train.yaml', params=h_params)
 
     if cfg.wandb:
-        import wandb
-        wandb.init(project='NeuralLNS',
-                   name=date,
-                   config=config_dict)
+        wandb.init(project='NeuralLNS', name=date, config=config_dict)
 
     model = Destroy(cfg)
     data_idx = list(range(cfg.num_data))
@@ -193,7 +191,7 @@ def train(cfg: dict):
             graphs, labels = [], []
 
             for d_id in data_idx[b_id * cfg.batch_size: (b_id + 1) * cfg.batch_size]:
-                with open('datas/train_data_32/train_data{}.pkl'.format(d_id), 'rb') as f:
+                with open('datas/32/train/train_data_{}.pkl'.format(d_id), 'rb') as f:
                     graph, destroy = pickle.load(f)
                     g = dgl.batch([dgl.node_subgraph(graph, list(set(range(graph.num_nodes())) - set(d_key)))
                                    for d_key in destroy.keys()])
@@ -212,7 +210,7 @@ def train(cfg: dict):
             wandb.log({'epoch_loss': epoch_loss})
 
         if (e + 1) % 10 == 0:
-            dir = 'datas/trained/models/{}/'.format(date)
+            dir = 'datas/models/{}/'.format(date)
             if not os.path.exists(dir):
                 os.makedirs(dir)
             torch.save(model.state_dict(), dir + '{}.pt'.format(e + 1))
