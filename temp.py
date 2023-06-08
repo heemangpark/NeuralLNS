@@ -21,18 +21,19 @@ from utils.solver import solver
 def temp(cfg: dict):
     for num in [100, 200, 300, 400, 500, 600, 700, 800, 900, 1000]:
         seed_everything(cfg.seed)
-        exp_idx = list(range(cfg.num_data))
-        exp_id = list(random.sample(exp_idx, k=num))
+        total_idx = list(range(cfg.num_data))
+        test_idx = copy.deepcopy(total_idx)
+        t_id = list(random.sample(test_idx, k=num))
         gap = []
 
-        for exp_id in tqdm(exp_id):
+        for t_id in tqdm(t_id):
             grid, grid_graph, a_coord, t_coord = load_scenarios(
                 '{}{}{}_{}_{}/scenario_{}.pkl'.format(cfg.map_size, cfg.map_size, cfg.obs_ratio,
-                                                      cfg.num_agent, cfg.num_task, exp_id))
+                                                      cfg.num_agent, cfg.num_task, t_id))
             assign_idx, assign_coord = hungarian(a_coord, t_coord)
 
             actual_init_cost, _ = solver(grid, a_coord, assign_coord, save_dir=cfg.save_dir,
-                                         exp_name='init' + str(exp_id))
+                                         exp_name='init' + str(t_id))
             est_init_cost = sum(
                 [sum(t) for t in [[abs(a[0] - b[0]) + abs(a[1] - b[1]) for a, b, in zip(sch[:-1], sch[1:])]
                                   for sch in assign_coord]])
@@ -78,7 +79,7 @@ def temp(cfg: dict):
                     assign_idx = temp_assign_idx
 
             actual_final_cost, _ = solver(grid, a_coord, assign_coord, save_dir=cfg.save_dir,
-                                          exp_name='fin' + str(exp_id))
+                                          exp_name='fin' + str(t_id))
             if os.path.exists(cfg.save_dir):
                 shutil.rmtree(cfg.save_dir)
 
