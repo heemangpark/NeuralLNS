@@ -20,19 +20,21 @@ from utils.solver import solver
 
 def temp(cfg: dict):
     seed_everything(cfg.seed)
-    for t in tqdm(list(random.sample(list(range(cfg.num_data)), k=100))):
-        grid, grid_graph, a_coord, t_coord = load_scenarios(
-            '{}{}{}_{}_{}/scenario_{}.pkl'.format(cfg.map_size, cfg.map_size, cfg.obs_ratio,
-                                                  cfg.num_agent, cfg.num_task, t))
-        assign_idx, assign_coord = hungarian(a_coord, t_coord)
+    for itrs in [100, 200, 300, 400, 500, 600, 700, 800, 900, 1000]:
+        gap = []
 
-        actual_init_cost, _ = solver(grid, a_coord, assign_coord, save_dir=cfg.save_dir, exp_name='init' + str(t))
-        est_init_cost = sum([sum(t) for t in [[abs(a[0] - b[0]) + abs(a[1] - b[1]) for a, b, in zip(sch[:-1], sch[1:])]
-                                              for sch in assign_coord]])
-        prev_cost = est_init_cost
+        for t in tqdm(list(random.sample(list(range(cfg.num_data)), k=100))):
+            grid, grid_graph, a_coord, t_coord = load_scenarios(
+                '{}{}{}_{}_{}/scenario_{}.pkl'.format(cfg.map_size, cfg.map_size, cfg.obs_ratio,
+                                                      cfg.num_agent, cfg.num_task, t))
+            assign_idx, assign_coord = hungarian(a_coord, t_coord)
 
-        for itrs in [100, 200, 300, 400, 500, 600, 700, 800, 900, 1000]:
-            gap = []
+            actual_init_cost, _ = solver(grid, a_coord, assign_coord, save_dir=cfg.save_dir, exp_name='init' + str(t))
+            est_init_cost = sum(
+                [sum(t) for t in [[abs(a[0] - b[0]) + abs(a[1] - b[1]) for a, b, in zip(sch[:-1], sch[1:])]
+                                  for sch in assign_coord]])
+            prev_cost = est_init_cost
+
             for itr in range(itrs):
                 temp_assign_idx = copy.deepcopy(assign_idx)
                 removal_idx = removal(assign_idx, t_coord)
