@@ -19,27 +19,21 @@ from utils.solver import solver
 
 
 def temp(cfg: dict):
-    for num in [100, 200, 300, 400, 500, 600, 700, 800, 900, 1000]:
-        seed_everything(cfg.seed)
-        total_idx = list(range(cfg.num_data))
-        test_idx = copy.deepcopy(total_idx)
-        t_id = list(random.sample(test_idx, k=num))
-        gap = []
+    seed_everything(cfg.seed)
+    for t in tqdm(list(random.sample(list(range(cfg.num_data)), k=100))):
+        grid, grid_graph, a_coord, t_coord = load_scenarios(
+            '{}{}{}_{}_{}/scenario_{}.pkl'.format(cfg.map_size, cfg.map_size, cfg.obs_ratio,
+                                                  cfg.num_agent, cfg.num_task, t))
+        assign_idx, assign_coord = hungarian(a_coord, t_coord)
 
-        for t in tqdm(t_id):
-            grid, grid_graph, a_coord, t_coord = load_scenarios(
-                '{}{}{}_{}_{}/scenario_{}.pkl'.format(cfg.map_size, cfg.map_size, cfg.obs_ratio,
-                                                      cfg.num_agent, cfg.num_task, t))
-            assign_idx, assign_coord = hungarian(a_coord, t_coord)
+        actual_init_cost, _ = solver(grid, a_coord, assign_coord, save_dir=cfg.save_dir, exp_name='init' + str(t))
+        est_init_cost = sum([sum(t) for t in [[abs(a[0] - b[0]) + abs(a[1] - b[1]) for a, b, in zip(sch[:-1], sch[1:])]
+                                              for sch in assign_coord]])
+        prev_cost = est_init_cost
 
-            actual_init_cost, _ = solver(grid, a_coord, assign_coord, save_dir=cfg.save_dir,
-                                         exp_name='init' + str(t))
-            est_init_cost = sum(
-                [sum(t) for t in [[abs(a[0] - b[0]) + abs(a[1] - b[1]) for a, b, in zip(sch[:-1], sch[1:])]
-                                  for sch in assign_coord]])
-
-            prev_cost = est_init_cost
-            for itr in range(cfg.itrs):
+        for itrs in [100, 200, 300, 400, 500, 600, 700, 800, 900, 1000]:
+            gap = []
+            for itr in range(itrs):
                 temp_assign_idx = copy.deepcopy(assign_idx)
                 removal_idx = removal(assign_idx, t_coord)
                 removed = [False for _ in removal_idx]
@@ -74,7 +68,7 @@ def temp(cfg: dict):
                     est_cost = sum([sum(t) for t in [[abs(a[0] - b[0]) + abs(a[1] - b[1])
                                                       for a, b, in zip(sch[:-1], sch[1:])] for sch in assign_coord]])
 
-                if (est_cost < prev_cost) or (itr == (cfg.itrs - 1)):
+                if (est_cost < prev_cost) or (itr == (itrs - 1)):
                     prev_cost = est_cost
                     assign_idx = temp_assign_idx
 
@@ -86,10 +80,10 @@ def temp(cfg: dict):
             perf = (actual_init_cost - actual_final_cost) / actual_init_cost * 100
             gap.append(perf)
 
-        plt.plot(gap)
-        plt.title('{:.4f}'.format(np.mean(gap)))
-        plt.savefig('itrs_{}.png'.format(cfg.itrs))
-        plt.clf()
+            plt.plot(gap)
+            plt.title('{:.4f}'.format(np.mean(gap)))
+            plt.savefig('itrs_{}.png'.format(itrs))
+            plt.clf()
 
 
 if __name__ == '__main__':
