@@ -82,10 +82,10 @@ def temp(cfg: dict):
             perf = (actual_init_cost - actual_final_cost) / actual_init_cost * 100
             gap.append(perf)
 
-            plt.plot(gap)
-            plt.title('{:.4f}'.format(np.mean(gap)))
-            plt.savefig('itrs_{}.png'.format(itrs))
-            plt.clf()
+        plt.plot(gap)
+        plt.title('{:.4f}'.format(np.mean(gap)))
+        plt.savefig('itrs_{}.png'.format(itrs))
+        plt.clf()
 
 
 if __name__ == '__main__':
