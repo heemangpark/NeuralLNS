@@ -97,7 +97,8 @@ class Destroy(nn.Module):
                         aggr=aggr, delta=delta, residual=True)
         self.readout = getattr(torch, readout)
         self.Wzz = nn.Linear(2, dim)
-        self.Why = nn.Linear(dim, 1)
+        self.Whp = nn.Linear(dim, 1)
+        self.Whn = nn.Linear(dim, 1)
 
         self.loss = nn.MarginRankingLoss()
         self.optimizer = Lion(self.parameters(), lr=lr, weight_decay=wd)
@@ -142,15 +143,16 @@ class Destroy(nn.Module):
         # loss = self.loss(pred.log(), cost)
         # loss = torch.mean(-(cost - baseline) * torch.log(pred + 1e-5))
         # loss = torch.mean(-cost * torch.log(pred + 1e-5))
-        b, k = target.shape
+        b = target.shape[0]
         z = self.Wzz(graphs.ndata['coord'])
-        graph_embedding = self.gnn(graphs, z).view(b, -1, k, z.shape[-1])
+        graph_embedding = self.gnn(graphs, z).view(b * 2, -1, z.shape[-1])
         h = self.readout(graph_embedding, dim=1)
-        y_hat = self.Why(h).view(b, k)
-        y_p, y_n = y_hat[:, 0], y_hat[:, 1]
-        y = torch.ones_like(y_p)
 
-        loss = self.loss(y_p, y_n, y)
+        mask = torch.Tensor([[p.item(), n.item()] for p, n in zip(target, -target)]).view(-1)
+        y_p = self.Whp(h)[mask == torch.ones(b * 2)].squeeze()
+        y_n = self.Whn(h)[mask == -torch.ones(b * 2)].squeeze()
+
+        loss = self.loss(y_p, y_n, target)
         self.optimizer.zero_grad()
         loss.backward()
         self.optimizer.step()

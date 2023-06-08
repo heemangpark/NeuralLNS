@@ -174,28 +174,33 @@ def train(cfg: dict):
 
     model = Destroy(cfg)
     train_idx = list(range(cfg.num_train))
+    flags = [1 for _ in range(cfg.batch_size // 2)] + [-1 for _ in range(cfg.batch_size // 2)]
 
     for e in trange(cfg.epochs):
         random.shuffle(train_idx)
         epoch_loss = 0
 
         for b_id in range(cfg.num_train // cfg.batch_size):
-            graphs, labels = [], []
+            random.shuffle(flags)
+            graphs = []
+            # labels = []
 
-            for t_id in train_idx[b_id * cfg.batch_size: (b_id + 1) * cfg.batch_size]:
+            train_id = train_idx[b_id * cfg.batch_size: (b_id + 1) * cfg.batch_size]
+            for t_id, flag in zip(train_id, flags):
                 with open('datas/32/train/{}.pkl'.format(t_id), 'rb') as f:
                     graph, destroy = pickle.load(f)
                     d_sorted = sorted(destroy.items(), key=lambda x: x[1], reverse=True)
-                    destroy = dict((d_sorted[0], d_sorted[-1]))
+                    destroy = dict((d_sorted[0], d_sorted[-1])) if flag == 1 else dict((d_sorted[-1], d_sorted[0]))
                     g = dgl.batch([dgl.node_subgraph(graph, list(set(range(graph.num_nodes())) - set(d_key)))
                                    for d_key in destroy.keys()])
                     graphs.append(g)
-                    labels.append(list(map(lambda x: x / 32, list(destroy.values()))))
+                    # labels.append(list(map(lambda x: x / 32, list(destroy.values()))))
 
             graphs = dgl.batch(graphs).to(cfg.device)
-            labels = torch.Tensor(labels).to(cfg.device)
+            # labels = torch.Tensor(labels).to(cfg.device)
+            flags = torch.Tensor(flags).to(cfg.device)
 
-            batch_loss = model(graphs, labels)
+            batch_loss = model(graphs, flags)
             epoch_loss += batch_loss
 
         epoch_loss /= (cfg.num_train // cfg.batch_size)
