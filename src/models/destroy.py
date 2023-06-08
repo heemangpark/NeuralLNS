@@ -160,12 +160,16 @@ class Destroy(nn.Module):
         return loss.item()
 
     def val(self, graphs: dgl.DGLHeteroGraph, target: torch.Tensor):
-        b, k = target.shape
+        b = target.shape[0]
         z = self.Wzz(graphs.ndata['coord'])
-        graph_embedding = self.gnn(graphs, z).view(b, -1, k, z.shape[-1])
+        graph_embedding = self.gnn(graphs, z).view(b * 2, -1, z.shape[-1])
         h = self.readout(graph_embedding, dim=1)
-        pred = self.Why(h).view(b, k)
-        return (torch.sum(pred[:, 0] > pred[:, 1]) / pred.shape[0] * 100).item()
+
+        mask = torch.Tensor([[p.item(), n.item()] for p, n in zip(target, -target)]).view(-1)
+        y_p = self.Whp(h)[mask == torch.ones(b * 2)].squeeze()
+        y_n = self.Whn(h)[mask == -torch.ones(b * 2)].squeeze()
+
+        return torch.sum(y_p > y_n).item() / b
 
     def act(self, graph: dgl.DGLHeteroGraph, candidates: list):
         b = len(candidates)

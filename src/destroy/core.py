@@ -234,11 +234,13 @@ def train(cfg: dict):
                             g = dgl.batch([dgl.node_subgraph(g, list(set(range(g.num_nodes())) - set(d_key)))
                                            for d_key in d.keys()])
                             graphs.append(g)
-                            y.append(list(map(lambda x: x / 32, list(d.values()))))
+                            # y.append(list(map(lambda x: x / 32, list(d.values()))))
 
                     graphs = dgl.batch(graphs).to(cfg.device)
-                    y = torch.Tensor(y).to(cfg.device)
-                    res.append(temp.val(graphs, y))
+                    # y = torch.Tensor(y).to(cfg.device)
+                    flags = [1 for _ in range(cfg.batch_size // 2)] + [-1 for _ in range(cfg.batch_size // 2)]
+                    flags = torch.Tensor(flags).to(cfg.device)
+                    res.append(temp.val(graphs, flags))
 
                 if cfg.wandb:
                     wandb.log({'val': np.mean(res)})
