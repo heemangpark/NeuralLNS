@@ -1,4 +1,6 @@
 import copy
+import os
+import shutil
 import subprocess
 
 import numpy as np
@@ -74,6 +76,9 @@ def to_solver(task_in_seq, assignment):
 
 
 def solver(map, agents, tasks, save_dir, exp_name, ret_log=False):
+    if not os.path.exists(save_dir + exp_name):
+        os.makedirs(save_dir + exp_name)
+
     time_log = dict()
     s_agents = copy.deepcopy(agents)
     todo = copy.deepcopy(tasks)
@@ -105,9 +110,14 @@ def solver(map, agents, tasks, save_dir, exp_name, ret_log=False):
              ]
         process_out = subprocess.run(c, capture_output=True)
         text_byte = process_out.stdout.decode('utf-8')
+
         if (text_byte[37:44] != 'Succeed') & ret_log:
+            if os.path.exists(save_dir + exp_name):
+                shutil.rmtree(save_dir + exp_name)
             return 'error', 'error', 'error'
         elif text_byte[37:44] != 'Succeed':
+            if os.path.exists(save_dir + exp_name):
+                shutil.rmtree(save_dir + exp_name)
             return 'error', 'error'
 
         traj = read_trajectory(save_dir + exp_name + "_paths_{}.txt".format(itr))
@@ -142,6 +152,8 @@ def solver(map, agents, tasks, save_dir, exp_name, ret_log=False):
 
         total_cost += next_t * len(d_len_traj)
 
+    if os.path.exists(save_dir + exp_name):
+        shutil.rmtree(save_dir + exp_name)
     if ret_log:
         return total_cost, seq_paths, time_log
     else:
