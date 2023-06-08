@@ -167,7 +167,7 @@ class Destroy(nn.Module):
 
         mask = torch.Tensor([[p.item(), n.item()] for p, n in zip(target, -target)]).view(-1)
         y_p = self.Whp(h)[mask == torch.ones(b * 2)].squeeze()
-        y_n = self.Whn(h)[mask == -torch.ones(b * 2)].squeeze()
+        y_n = self.Whp(h)[mask == -torch.ones(b * 2)].squeeze()
 
         return torch.sum(y_p > y_n).item() / b
 

@@ -253,25 +253,27 @@ def val(cfg: dict):
     model.eval()
 
     val_idx = list(range(cfg.num_val))
+    flags = [1 for _ in range(cfg.batch_size // 2)] + [-1 for _ in range(cfg.batch_size // 2)]
     random.shuffle(val_idx)
 
     res = []
-    for b_id in trange(cfg.num_val // cfg.batch_size):
-        graphs, y = [], []
+    for b_id in range(cfg.num_val // cfg.batch_size):
+        graphs = []
+        random.shuffle(flags)
 
-        for v_id in val_idx[b_id * cfg.batch_size: (b_id + 1) * cfg.batch_size]:
+        val_id = val_idx[b_id * cfg.batch_size: (b_id + 1) * cfg.batch_size]
+        for v_id, flag in zip(val_id, flags):
             with open('datas/32/val/{}.pkl'.format(v_id), 'rb') as f:
                 g, d = pickle.load(f)
                 d_sorted = sorted(d.items(), key=lambda x: x[1], reverse=True)
-                d = dict((d_sorted[0], d_sorted[-1]))
+                destroy = dict((d_sorted[0], d_sorted[-1])) if flag == 1 else dict((d_sorted[-1], d_sorted[0]))
                 g = dgl.batch([dgl.node_subgraph(g, list(set(range(g.num_nodes())) - set(d_key)))
-                               for d_key in d.keys()])
+                               for d_key in destroy.keys()])
                 graphs.append(g)
-                y.append(list(map(lambda x: x / 32, list(d.values()))))
 
         graphs = dgl.batch(graphs).to(cfg.device)
-        y = torch.Tensor(y).to(cfg.device)
-        res.append(model.val(graphs, y))
+        flags = torch.Tensor(flags).to(cfg.device)
+        res.append(model.val(graphs, flags))
 
     print('{:.4f}'.format(np.mean(res)))
 

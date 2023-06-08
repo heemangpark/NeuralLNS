@@ -9,9 +9,9 @@ wandb: True
 
 model:
   aggr: max
-  delta: 1
+  delta: 5
   dim: 64
-  num_layers: 3
+  num_layers: 1
   readout: sum
   type: MPNN
 
