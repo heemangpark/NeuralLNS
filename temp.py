@@ -30,10 +30,8 @@ def temp(cfg: dict):
             assign_idx, assign_coord = hungarian(a_coord, t_coord)
 
             actual_init_cost, _ = solver(grid, a_coord, assign_coord, save_dir=cfg.save_dir, exp_name='init' + str(t))
-            est_init_cost = sum(
-                [sum(t) for t in [[abs(a[0] - b[0]) + abs(a[1] - b[1]) for a, b, in zip(sch[:-1], sch[1:])]
-                                  for sch in assign_coord]])
-            prev_cost = est_init_cost
+            prev_cost = sum([sum(t) for t in [[abs(a[0] - b[0]) + abs(a[1] - b[1])
+                                               for a, b, in zip(sch[:-1], sch[1:])] for sch in assign_coord]])
 
             for itr in range(itrs):
                 temp_assign_idx = copy.deepcopy(assign_idx)
@@ -70,12 +68,12 @@ def temp(cfg: dict):
                     est_cost = sum([sum(t) for t in [[abs(a[0] - b[0]) + abs(a[1] - b[1])
                                                       for a, b, in zip(sch[:-1], sch[1:])] for sch in assign_coord]])
 
-                if (est_cost < prev_cost) or (itr == (itrs - 1)):
+                if est_cost < prev_cost:
                     prev_cost = est_cost
-                    assign_idx = temp_assign_idx
+                    assign_idx = copy.deepcopy(temp_assign_idx)
 
-            actual_final_cost, _ = solver(grid, a_coord, assign_coord, save_dir=cfg.save_dir,
-                                          exp_name='fin' + str(t))
+            actual_final_cost, _ = solver(grid, a_coord, assign_coord, save_dir=cfg.save_dir, exp_name='fin' + str(t))
+
             if os.path.exists(cfg.save_dir):
                 shutil.rmtree(cfg.save_dir)
 
