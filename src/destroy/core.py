@@ -189,6 +189,7 @@ def train(cfg: dict):
             for t_id, flag in zip(train_id, flags):
                 with open('datas/32/train/{}.pkl'.format(t_id), 'rb') as f:
                     graph, destroy = pickle.load(f)
+                    temp = [e for e in graph.edges if e.data['connected'].item() == 1]
                     d_sorted = sorted(destroy.items(), key=lambda x: x[1], reverse=True)
                     destroy = dict((d_sorted[0], d_sorted[-1])) if flag == 1 else dict((d_sorted[-1], d_sorted[0]))
                     g = dgl.batch([dgl.node_subgraph(graph, list(set(range(graph.num_nodes())) - set(d_key)))

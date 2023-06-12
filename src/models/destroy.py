@@ -95,6 +95,8 @@ class Destroy(nn.Module):
 
         self.gnn = MPNN(in_dim=dim, out_dim=dim, embedding_dim=dim, n_layers=num_layers,
                         aggr=aggr, delta=delta, residual=True)
+        # layer = TransformerEncoderLayer(d_model=dim, nhead=8, batch_first=True)
+        # self.gnn = TransformerEncoder(layer, num_layers=2)
         self.readout = getattr(torch, readout)
         self.Wzz = nn.Linear(2, dim)
         self.Whp = nn.Linear(dim, 1)
@@ -145,12 +147,15 @@ class Destroy(nn.Module):
         # loss = torch.mean(-cost * torch.log(pred + 1e-5))
         b = target.shape[0]
         z = self.Wzz(graphs.ndata['coord'])
-        graph_embedding = self.gnn(graphs, z).view(b * 2, -1, z.shape[-1])
+        graph_embedding = self.gnn(z.reshape(b, -1, z.shape[-1]))
+        # graph_embedding = self.gnn(graphs, z).view(b * 2, -1, z.shape[-1])
         h = self.readout(graph_embedding, dim=1)
 
         mask = torch.Tensor([[p.item(), n.item()] for p, n in zip(target, -target)]).view(-1)
         y_p = self.Whp(h)[mask == torch.ones(b * 2)].squeeze()
         y_n = self.Whn(h)[mask == -torch.ones(b * 2)].squeeze()
+        # y_p = self.Whp(h).squeeze()
+        # y_n = self.Whn(h).squeeze()
 
         loss = self.loss(y_p, y_n, target)
         self.optimizer.zero_grad()
@@ -162,14 +167,18 @@ class Destroy(nn.Module):
     def val(self, graphs: dgl.DGLHeteroGraph, target: torch.Tensor):
         b = target.shape[0]
         z = self.Wzz(graphs.ndata['coord'])
-        graph_embedding = self.gnn(graphs, z).view(b * 2, -1, z.shape[-1])
+        # graph_embedding = self.gnn(graphs, z).view(b * 2, -1, z.shape[-1])
+        graph_embedding = self.gnn(z.reshape(b, -1, z.shape[-1]))
         h = self.readout(graph_embedding, dim=1)
 
         mask = torch.Tensor([[p.item(), n.item()] for p, n in zip(target, -target)]).view(-1)
         y_p = self.Whp(h)[mask == torch.ones(b * 2)].squeeze()
         y_n = self.Whp(h)[mask == -torch.ones(b * 2)].squeeze()
+        # y_p = self.Whp(h).squeeze()
+        # y_n = self.Whp(h).squeeze()
+        correct = (target[y_p > y_n] == 1).sum().item() + (target[y_p < y_n] == -1).sum().item()
 
-        return torch.sum(y_p > y_n).item() / b
+        return correct / b
 
     def act(self, graph: dgl.DGLHeteroGraph, candidates: list):
         b = len(candidates)
@@ -181,3 +190,12 @@ class Destroy(nn.Module):
         pred = self.Why(h)
 
         return list(candidates[torch.argmax(pred).item()])
+
+# if __name__ == '__main__':
+#     from torch.nn import TransformerEncoder, TransformerEncoderLayer
+#
+#     layer = TransformerEncoderLayer(d_model=64, nhead=8, batch_first=True)
+#     gnn = TransformerEncoder(layer, num_layers=2)
+#
+#     inp = torch.rand((7, 64))
+#     out = gnn(inp)
