@@ -175,14 +175,13 @@ def train(cfg: dict):
 
     model = Destroy(cfg)
     train_idx = list(range(cfg.num_train))
-    flags = [1 for _ in range(cfg.batch_size // 2)] + [-1 for _ in range(cfg.batch_size // 2)]
 
     for e in trange(cfg.epochs):
         random.shuffle(train_idx)
         epoch_loss = 0
 
         for b_id in range(cfg.num_train // cfg.batch_size):
-            random.shuffle(flags)
+            flags = [random.choice([1, -1]) for _ in range(cfg.batch_size)]
             graphs = []
             # labels = []
 
@@ -191,7 +190,7 @@ def train(cfg: dict):
                 with open('datas/32/train/{}.pkl'.format(t_id), 'rb') as f:
                     graph, destroy = pickle.load(f)
                 d_sorted = sorted(destroy.items(), key=lambda x: x[1], reverse=True)
-                destroy = dict((d_sorted[0], d_sorted[-1])) if flag == 1 else dict((d_sorted[-1], d_sorted[0]))
+                destroy = dict((d_sorted[0], d_sorted[1])) if flag == 1 else dict((d_sorted[1], d_sorted[0]))
                 graphs += [dgl.node_subgraph(graph, list(set(range(graph.num_nodes())) - set(d_key)))
                            for d_key in destroy.keys()]
                 # labels.append(list(map(lambda x: x / 32, list(destroy.values()))))
@@ -227,9 +226,9 @@ def train(cfg: dict):
                         graph, destroy = pickle.load(f)
                     d_sorted = sorted(destroy.items(), key=lambda x: x[1], reverse=True)
                     if PN[0] == 'P':
-                        destroy = dict((d_sorted[0], d_sorted[-1]))
+                        destroy = dict((d_sorted[0], d_sorted[1]))
                     else:
-                        destroy = dict((d_sorted[-1], d_sorted[0]))
+                        destroy = dict((d_sorted[1], d_sorted[0]))
                     graphs = dgl.batch([dgl.node_subgraph(graph, list(set(range(graph.num_nodes())) - set(d_key)))
                                         for d_key in destroy.keys()]).to(cfg.device)
                     val_res = temp.val(graphs)
