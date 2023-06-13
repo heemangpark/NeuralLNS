@@ -103,7 +103,7 @@ class Destroy(nn.Module):
         self.readout = getattr(torch, readout)
         self.Wzz = nn.Linear(2, dim)
 
-        self.loss = nn.MarginRankingLoss()
+        self.loss = nn.MarginRankingLoss(margin=cfg.rank_margin)
         self.optimizer = Lion(self.parameters(), lr=lr, weight_decay=wd)
 
         self.to(cfg.device)
