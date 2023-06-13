@@ -1,4 +1,4 @@
-batch_size: 100
+batch_size: 800
 device: cuda:0
 epochs: 100
 num_train: 8000

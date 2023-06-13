@@ -221,7 +221,7 @@ def train(cfg: dict):
                 flags = ['P', 'N']
                 correct = 0
 
-                for v_id in list(range(cfg.num_val)):
+                for v_id in range(cfg.num_val):
                     random.shuffle(flags)
                     with open('datas/32/val/{}.pkl'.format(v_id), 'rb') as f:
                         graph, destroy = pickle.load(f)
@@ -238,7 +238,7 @@ def train(cfg: dict):
                         correct += 1
 
                 if cfg.wandb:
-                    wandb.log({'val_result': correct / cfg.val})
+                    wandb.log({'val_result': correct / cfg.num_val})
 
 
 def eval(cfg: dict):
