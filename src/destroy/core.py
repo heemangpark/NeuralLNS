@@ -16,6 +16,7 @@ from omegaconf import OmegaConf
 from tqdm import trange, tqdm
 
 sys.path.append(os.path.dirname(os.path.abspath(os.path.dirname(__file__))))
+os.environ["CUDA_VISIBLE_DEVICES"] = "0, 1, 2, 3"
 from src.heuristics.hungarian import hungarian
 from src.heuristics.regret import f_ijk
 from src.heuristics.shaw import removal
@@ -189,19 +190,17 @@ def train(cfg: dict):
             for t_id, flag in zip(train_id, flags):
                 with open('datas/32/train/{}.pkl'.format(t_id), 'rb') as f:
                     graph, destroy = pickle.load(f)
-                    temp = [e for e in graph.edges if e.data['connected'].item() == 1]
-                    d_sorted = sorted(destroy.items(), key=lambda x: x[1], reverse=True)
-                    destroy = dict((d_sorted[0], d_sorted[-1])) if flag == 1 else dict((d_sorted[-1], d_sorted[0]))
-                    g = dgl.batch([dgl.node_subgraph(graph, list(set(range(graph.num_nodes())) - set(d_key)))
-                                   for d_key in destroy.keys()])
-                    graphs.append(g)
-                    # labels.append(list(map(lambda x: x / 32, list(destroy.values()))))
+                d_sorted = sorted(destroy.items(), key=lambda x: x[1], reverse=True)
+                destroy = dict((d_sorted[0], d_sorted[-1])) if flag == 1 else dict((d_sorted[-1], d_sorted[0]))
+                graphs += [dgl.node_subgraph(graph, list(set(range(graph.num_nodes())) - set(d_key)))
+                           for d_key in destroy.keys()]
+                # labels.append(list(map(lambda x: x / 32, list(destroy.values()))))
 
             graphs = dgl.batch(graphs).to(cfg.device)
+            targets = torch.Tensor(flags).to(cfg.device)
             # labels = torch.Tensor(labels).to(cfg.device)
-            flags = torch.Tensor(flags).to(cfg.device)
 
-            batch_loss = model(graphs, flags)
+            batch_loss = model(graphs, targets)
             epoch_loss += batch_loss
 
         epoch_loss /= (cfg.num_train // cfg.batch_size)
@@ -209,74 +208,37 @@ def train(cfg: dict):
         if cfg.wandb:
             wandb.log({'epoch_loss': epoch_loss})
 
-        if (e % 10 == 0) or (e == cfg.epochs):
+        if (e + 1) % 10 == 0:
             dir = 'datas/models/{}/'.format(date)
             if not os.path.exists(dir):
                 os.makedirs(dir)
-            torch.save(model.state_dict(), dir + '{}.pt'.format(e))
+            torch.save(model.state_dict(), dir + '{}.pt'.format(e + 1))
 
             if cfg.val:
                 temp = Destroy(cfg)
-                temp.load_state_dict(torch.load(dir + '{}.pt'.format(e)))
+                temp.load_state_dict(torch.load(dir + '{}.pt'.format(e + 1)))
                 temp.eval()
+                flags = ['P', 'N']
+                correct = 0
 
-                val_idx = list(range(cfg.num_val))
-                random.shuffle(val_idx)
+                for v_id in list(range(cfg.num_val)):
+                    random.shuffle(flags)
+                    with open('datas/32/val/{}.pkl'.format(v_id), 'rb') as f:
+                        graph, destroy = pickle.load(f)
+                    d_sorted = sorted(destroy.items(), key=lambda x: x[1], reverse=True)
+                    if flags[0] == 'P':
+                        destroy = dict((d_sorted[0], d_sorted[-1]))
+                    else:
+                        destroy = dict((d_sorted[-1], d_sorted[0]))
+                    graphs = dgl.batch([dgl.node_subgraph(graph, list(set(range(graph.num_nodes())) - set(d_key)))
+                                        for d_key in destroy.keys()]).to(cfg.device)
+                    val_res = temp.val(graphs)
 
-                res = []
-                for b_id in range(cfg.num_val // cfg.batch_size):
-                    graphs, y = [], []
-
-                    for v_id in val_idx[b_id * cfg.batch_size: (b_id + 1) * cfg.batch_size]:
-                        with open('datas/32/val/{}.pkl'.format(v_id), 'rb') as f:
-                            g, d = pickle.load(f)
-                            d_sorted = sorted(d.items(), key=lambda x: x[1], reverse=True)
-                            d = dict((d_sorted[0], d_sorted[-1]))
-                            g = dgl.batch([dgl.node_subgraph(g, list(set(range(g.num_nodes())) - set(d_key)))
-                                           for d_key in d.keys()])
-                            graphs.append(g)
-                            # y.append(list(map(lambda x: x / 32, list(d.values()))))
-
-                    graphs = dgl.batch(graphs).to(cfg.device)
-                    # y = torch.Tensor(y).to(cfg.device)
-                    flags = [1 for _ in range(cfg.batch_size // 2)] + [-1 for _ in range(cfg.batch_size // 2)]
-                    flags = torch.Tensor(flags).to(cfg.device)
-                    res.append(temp.val(graphs, flags))
+                    if val_res == flags[0]:
+                        correct += 1
 
                 if cfg.wandb:
-                    wandb.log({'val': np.mean(res)})
-
-
-def val(cfg: dict):
-    seed_everything(cfg.seed)
-    model = Destroy(cfg)
-    model.load_state_dict(torch.load(cfg.dir + '{}.pt'.format(cfg.model_ver)))
-    model.eval()
-
-    val_idx = list(range(cfg.num_val))
-    flags = [1 for _ in range(cfg.batch_size // 2)] + [-1 for _ in range(cfg.batch_size // 2)]
-    random.shuffle(val_idx)
-
-    res = []
-    for b_id in range(cfg.num_val // cfg.batch_size):
-        graphs = []
-        random.shuffle(flags)
-
-        val_id = val_idx[b_id * cfg.batch_size: (b_id + 1) * cfg.batch_size]
-        for v_id, flag in zip(val_id, flags):
-            with open('datas/32/val/{}.pkl'.format(v_id), 'rb') as f:
-                g, d = pickle.load(f)
-                d_sorted = sorted(d.items(), key=lambda x: x[1], reverse=True)
-                destroy = dict((d_sorted[0], d_sorted[-1])) if flag == 1 else dict((d_sorted[-1], d_sorted[0]))
-                g = dgl.batch([dgl.node_subgraph(g, list(set(range(g.num_nodes())) - set(d_key)))
-                               for d_key in destroy.keys()])
-                graphs.append(g)
-
-        graphs = dgl.batch(graphs).to(cfg.device)
-        flags = torch.Tensor(flags).to(cfg.device)
-        res.append(model.val(graphs, flags))
-
-    print('{:.4f}'.format(np.mean(res)))
+                    wandb.log({'val_result': correct / cfg.val})
 
 
 def eval(cfg: dict):

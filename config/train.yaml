@@ -4,14 +4,14 @@ epochs: 100
 num_train: 8000
 num_val: 2000
 seed: 42
-val: False
-wandb: False
+val: True
+wandb: True
 
 model:
   aggr: max
   delta: 5
   dim: 64
-  num_layers: 1
+  num_layers: 3
   readout: sum
   type: MPNN
 

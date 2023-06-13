@@ -95,12 +95,13 @@ class Destroy(nn.Module):
 
         self.gnn = MPNN(in_dim=dim, out_dim=dim, embedding_dim=dim, n_layers=num_layers,
                         aggr=aggr, delta=delta, residual=True)
+        self.mlp = nn.Sequential(nn.Linear(dim, dim // 2), nn.ReLU(),
+                                 nn.Linear(dim // 2, dim // 2), nn.ReLU(),
+                                 nn.Linear(dim // 2, 1))
         # layer = TransformerEncoderLayer(d_model=dim, nhead=8, batch_first=True)
         # self.gnn = TransformerEncoder(layer, num_layers=2)
         self.readout = getattr(torch, readout)
         self.Wzz = nn.Linear(2, dim)
-        self.Whp = nn.Linear(dim, 1)
-        self.Whn = nn.Linear(dim, 1)
 
         self.loss = nn.MarginRankingLoss()
         self.optimizer = Lion(self.parameters(), lr=lr, weight_decay=wd)
@@ -145,40 +146,35 @@ class Destroy(nn.Module):
         # loss = self.loss(pred.log(), cost)
         # loss = torch.mean(-(cost - baseline) * torch.log(pred + 1e-5))
         # loss = torch.mean(-cost * torch.log(pred + 1e-5))
-        b = target.shape[0]
+        # graphs = dgl.batch(dgl.unbatch(graphs)[target.device.index * graphs.batch_size // 4:
+        #                                        (target.device.index + 1) * graphs.batch_size // 4]).to(target.device)
+        b = graphs.batch_size
         z = self.Wzz(graphs.ndata['coord'])
-        graph_embedding = self.gnn(z.reshape(b, -1, z.shape[-1]))
-        # graph_embedding = self.gnn(graphs, z).view(b * 2, -1, z.shape[-1])
-        h = self.readout(graph_embedding, dim=1)
+        _, dim = z.shape
 
-        mask = torch.Tensor([[p.item(), n.item()] for p, n in zip(target, -target)]).view(-1)
-        y_p = self.Whp(h)[mask == torch.ones(b * 2)].squeeze()
-        y_n = self.Whn(h)[mask == -torch.ones(b * 2)].squeeze()
-        # y_p = self.Whp(h).squeeze()
-        # y_n = self.Whn(h).squeeze()
+        graph_embedding = self.gnn(graphs, z).view(b, -1, dim)
+        h = self.readout(graph_embedding, dim=1).view(-1, 2, dim)
+        y_hat = self.mlp(h).view(-1, 2)
 
-        loss = self.loss(y_p, y_n, target)
+        loss = self.loss(y_hat[:, 0], y_hat[:, 1], target)
         self.optimizer.zero_grad()
         loss.backward()
         self.optimizer.step()
 
         return loss.item()
 
-    def val(self, graphs: dgl.DGLHeteroGraph, target: torch.Tensor):
-        b = target.shape[0]
+    def val(self, graphs: dgl.DGLHeteroGraph):
+        b = graphs.batch_size
         z = self.Wzz(graphs.ndata['coord'])
-        # graph_embedding = self.gnn(graphs, z).view(b * 2, -1, z.shape[-1])
-        graph_embedding = self.gnn(z.reshape(b, -1, z.shape[-1]))
-        h = self.readout(graph_embedding, dim=1)
+        _, dim = z.shape
 
-        mask = torch.Tensor([[p.item(), n.item()] for p, n in zip(target, -target)]).view(-1)
-        y_p = self.Whp(h)[mask == torch.ones(b * 2)].squeeze()
-        y_n = self.Whp(h)[mask == -torch.ones(b * 2)].squeeze()
-        # y_p = self.Whp(h).squeeze()
-        # y_n = self.Whp(h).squeeze()
-        correct = (target[y_p > y_n] == 1).sum().item() + (target[y_p < y_n] == -1).sum().item()
-
-        return correct / b
+        graph_embedding = self.gnn(graphs, z).view(b, -1, dim)
+        h = self.readout(graph_embedding, dim=1).view(-1, 2, dim)
+        y_hat = self.mlp(h).view(-1, 2)
+        if y_hat[:, 0] > y_hat[:, 1]:
+            return 'P'
+        else:
+            return 'N'
 
     def act(self, graph: dgl.DGLHeteroGraph, candidates: list):
         b = len(candidates)
