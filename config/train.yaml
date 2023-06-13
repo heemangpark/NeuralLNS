@@ -1,8 +1,8 @@
-batch_size: 800
+batch_size: 8
 device: cuda:0
 epochs: 100
-num_train: 8000
-num_val: 2000
+num_train: 80
+num_val: 20
 seed: 42
 val: True
 wandb: True

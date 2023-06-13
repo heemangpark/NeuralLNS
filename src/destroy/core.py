@@ -218,15 +218,15 @@ def train(cfg: dict):
                 temp = Destroy(cfg)
                 temp.load_state_dict(torch.load(dir + '{}.pt'.format(e + 1)))
                 temp.eval()
-                flags = ['P', 'N']
+                PN = ['P', 'N']
                 correct = 0
 
                 for v_id in range(cfg.num_val):
-                    random.shuffle(flags)
+                    random.shuffle(PN)
                     with open('datas/32/val/{}.pkl'.format(v_id), 'rb') as f:
                         graph, destroy = pickle.load(f)
                     d_sorted = sorted(destroy.items(), key=lambda x: x[1], reverse=True)
-                    if flags[0] == 'P':
+                    if PN[0] == 'P':
                         destroy = dict((d_sorted[0], d_sorted[-1]))
                     else:
                         destroy = dict((d_sorted[-1], d_sorted[0]))
@@ -234,7 +234,7 @@ def train(cfg: dict):
                                         for d_key in destroy.keys()]).to(cfg.device)
                     val_res = temp.val(graphs)
 
-                    if val_res == flags[0]:
+                    if val_res == PN[0]:
                         correct += 1
 
                 if cfg.wandb:
