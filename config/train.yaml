@@ -1,9 +1,9 @@
 batch_size: 800
 device: cuda:3
-epochs: 100
+epochs: 1000
 num_train: 8000
 num_val: 2000
-rank_margin: 1
+rank_margin: .5
 seed: 42
 val: True
 wandb: True
@@ -12,7 +12,7 @@ model:
   aggr: max
   delta: 5
   dim: 64
-  num_layers: 3
+  num_layers: 1
   readout: sum
   type: MPNN
 

@@ -146,8 +146,6 @@ class Destroy(nn.Module):
         # loss = self.loss(pred.log(), cost)
         # loss = torch.mean(-(cost - baseline) * torch.log(pred + 1e-5))
         # loss = torch.mean(-cost * torch.log(pred + 1e-5))
-        # graphs = dgl.batch(dgl.unbatch(graphs)[target.device.index * graphs.batch_size // 4:
-        #                                        (target.device.index + 1) * graphs.batch_size // 4]).to(target.device)
         b = graphs.batch_size
         z = self.Wzz(graphs.ndata['coord'])
         _, dim = z.shape
@@ -155,7 +153,8 @@ class Destroy(nn.Module):
         graph_embedding = self.gnn(graphs, z).view(b, -1, dim)
         h = self.readout(graph_embedding, dim=1).view(-1, 2, dim)
         y_hat = self.mlp(h).view(-1, 2)
-
+        # res = [True if max(0, -y*(x1-x2)+1) == 0 else False for x1, x2, y in zip(y_hat[:, 0], y_hat[:, 1], target)]
+        # return sum(res) / len(res) * 100
         loss = self.loss(y_hat[:, 0], y_hat[:, 1], target)
         self.optimizer.zero_grad()
         loss.backward()

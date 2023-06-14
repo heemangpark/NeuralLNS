@@ -183,7 +183,6 @@ def train(cfg: dict):
         for b_id in range(cfg.num_train // cfg.batch_size):
             flags = [random.choice([1, -1]) for _ in range(cfg.batch_size)]
             graphs = []
-            # labels = []
 
             train_id = train_idx[b_id * cfg.batch_size: (b_id + 1) * cfg.batch_size]
             for t_id, flag in zip(train_id, flags):
@@ -193,13 +192,12 @@ def train(cfg: dict):
                 destroy = dict((d_sorted[0], d_sorted[1])) if flag == 1 else dict((d_sorted[1], d_sorted[0]))
                 graphs += [dgl.node_subgraph(graph, list(set(range(graph.num_nodes())) - set(d_key)))
                            for d_key in destroy.keys()]
-                # labels.append(list(map(lambda x: x / 32, list(destroy.values()))))
 
             graphs = dgl.batch(graphs).to(cfg.device)
             targets = torch.Tensor(flags).to(cfg.device)
-            # labels = torch.Tensor(labels).to(cfg.device)
 
             batch_loss = model(graphs, targets)
+            # print(batch_loss)
             epoch_loss += batch_loss
 
         epoch_loss /= (cfg.num_train // cfg.batch_size)
