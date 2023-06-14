@@ -30,10 +30,10 @@ def save_scenarios(itrs: int, size: int, obs: int, a: int, t: int,
     for itr in trange(itrs):
         grid_idx = list(range(len(graph)))
         a_idx = random.sample(grid_idx, a)
-        a_coord = np.array(graph.nodes())[a_idx].tolist()
-
         grid_idx = list(set(grid_idx) - set(a_idx))
         t_idx = random.sample(grid_idx, t)
+
+        a_coord = np.array(graph.nodes())[a_idx].tolist()
         t_coord = np.array(graph.nodes())[t_idx].tolist()
 
         type = dict(zip(graph.nodes(), ['B' for _ in range(graph.number_of_nodes())]))
