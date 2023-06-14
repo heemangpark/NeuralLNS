@@ -30,7 +30,7 @@ from utils.solver import solver
 def train_data(cfg: dict):
     seed_everything(cfg.seed)
     for exp_num in trange(cfg.num_data):
-        grid, grid_graph, a_coord, t_coord = load_scenarios('{}{}{}_{}_{}/scenario_{}.pkl'
+        grid, grid_graph, a_coord, t_coord = load_scenarios('{}{}{}_{}_{}_train/scenario_{}.pkl'
                                                             .format(cfg.map_size, cfg.map_size, cfg.obs_ratio,
                                                                     cfg.num_agent, cfg.num_task, exp_num))
         assign_idx, assign_coord = hungarian(a_coord, t_coord)
@@ -95,8 +95,8 @@ def train_data(cfg: dict):
                 cost_dict[D] = decrement
 
         total_data = [sch_graph, cost_dict]
-        with open('datas/train_data_{}/train_data{}.pkl'.format(cfg.map_size, exp_num), 'wb') as f:
-            pickle.dump(total_data, f)
+        # with open('datas/{}/train/{}.pkl'.format(cfg.map_size, exp_num), 'wb') as f:
+        #     pickle.dump(total_data, f)
 
 
 def eval_data(cfg: dict):
@@ -157,9 +157,9 @@ def eval_data(cfg: dict):
         cost, _, time_log = solver(grid, a_coord, assign_pos,
                                    save_dir=cfg.save_dir, exp_name=str(eval_id), ret_log=True)
 
-        with open('datas/eval_data_{}/eval_data{}.pkl'.format(cfg.map_size, eval_id), 'wb') as f:
-            pickle.dump([grid, map_graph, a_coord, t_coord,
-                         assign_idx, assign_coord, schedule, sch_graph, init_cost, cost], f)
+        # with open('datas/{}/eval/{}.pkl'.format(cfg.map_size, eval_id), 'wb') as f:
+        #     pickle.dump([grid, map_graph, a_coord, t_coord, assign_idx, assign_coord,
+        #                  schedule, sch_graph, init_cost, cost], f)
 
 
 def train(cfg: dict):

@@ -25,9 +25,9 @@ def save_scenarios(itrs: int, size: int, obs: int, a: int, t: int,
     else:
         dir = scenario_dir + '/{}{}{}_{}_{}_eval/'.format(size, size, obs, a, t)
 
-    grid, graph = valid_graph(size, obs)
-
     for itr in trange(itrs):
+        grid, graph = valid_graph(size, obs)
+
         grid_idx = list(range(len(graph)))
         a_idx = random.sample(grid_idx, a)
         grid_idx = list(set(grid_idx) - set(a_idx))
