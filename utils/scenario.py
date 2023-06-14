@@ -37,10 +37,10 @@ def save_scenarios(itrs: int, size: int, obs: int, a: int, t: int,
         t_coord = np.array(graph.nodes())[t_idx].tolist()
 
         type = dict(zip(graph.nodes(), ['B' for _ in range(graph.number_of_nodes())]))
-        for a in a_coord:
-            type[tuple(a)] = 'A'
-        for t in t_coord:
-            type[tuple(a)] = 'T'
+        for _a in a_coord:
+            type[tuple(_a)] = 'A'
+        for _t in t_coord:
+            type[tuple(_t)] = 'T'
         nx.set_node_attributes(G=graph, values=type, name='type')
         data = [grid, graph, a_coord, t_coord]
 
