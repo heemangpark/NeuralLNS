@@ -1,12 +1,16 @@
 import copy
 import os
+import pickle
 import random
 import shutil
 import sys
 
+import networkx as nx
 import numpy as np
+import torch
 from matplotlib import pyplot as plt
-from omegaconf import OmegaConf
+from torch_geometric.data import Data
+from torch_geometric.loader import DataLoader
 from tqdm import tqdm
 
 sys.path.append(os.path.dirname(os.path.abspath(os.path.dirname(__file__))))
@@ -18,8 +22,9 @@ from utils.seed import seed_everything
 from utils.solver import solver
 
 
-def temp(cfg):
+def lns_itr_test(cfg):
     seed_everything(cfg.seed)
+
     for itrs in [100, 200, 300, 400, 500, 600, 700, 800, 900, 1000]:
         gap = []
 
@@ -86,9 +91,33 @@ def temp(cfg):
         plt.clf()
 
 
-def test_solver():
-    pass
+def pyg_8820_5_5():
+    data_list = []
+
+    for s_id in range(10000):
+        with open('datas/scenarios/8820_5_5_train/scenario_{}.pkl'.format(s_id), 'rb') as f:
+            grid, graph, a_coord, t_coord = pickle.load(f)
+
+        x = torch.cat((torch.FloatTensor(a_coord), torch.FloatTensor(t_coord))) / grid.shape[0]
+
+        edge_index = torch.LongTensor([[r, c, c, r] for r in range(len(a_coord))
+                                       for c in range(len(a_coord), len(a_coord) + len(t_coord))]).view(-1, 2)
+
+        edge_attr = torch.Tensor([[nx.astar_path_length(graph, tuple(_a), tuple(_t)) / grid.shape[0]] * 2
+                                  for _a in a_coord for _t in t_coord]).flatten()
+
+        data_list.append(Data(x=x, edge_index=edge_index, edge_attr=edge_attr))
+
+    torch.save(data_list, 'datas/pyg/8820_5_5.pt')
+
+
+def main():
+    data_list = torch.load('datas/pyg/8820_5_5.pt')
+    loader = DataLoader(data_list)
+    debug = 1
 
 
 if __name__ == '__main__':
-    temp(OmegaConf.load('config/temp.yaml'))
+    # temp(OmegaConf.load('config/lns_itr_test.yaml'))
+    # pyg_8820_5_5()
+    main()
