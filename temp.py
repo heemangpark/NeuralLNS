@@ -1,6 +1,5 @@
 import copy
 import os
-import pickle
 import random
 import shutil
 import sys
@@ -10,8 +9,7 @@ import numpy as np
 import torch
 from matplotlib import pyplot as plt
 from torch_geometric.data import Data, HeteroData
-from torch_geometric.loader import DataLoader
-from tqdm import tqdm, trange
+from tqdm import tqdm
 
 sys.path.append(os.path.dirname(os.path.abspath(os.path.dirname(__file__))))
 from src.heuristics.hungarian import hungarian
@@ -94,12 +92,10 @@ def lns_itr_test(cfg):
 def pyg(data_type: str, graph_type: str):
     if graph_type == 'homo':
         data_list_A, data_list_M, data_list_P = [], [], []
+        scenarios = torch.load('datas/scenarios/8_8_20_5_5/{}.pt'.format(data_type))
 
-        scen_dir = 'datas/scenarios/8820_5_5_{}/'.format(data_type)
-        for s_id in trange(next(os.walk(scen_dir))[2]):
-
-            with open(scen_dir + 'scenario_{}.pkl'.format(s_id), 'rb') as f:
-                grid, graph, a_coord, t_coord = pickle.load(f)
+        for scen in tqdm(scenarios):
+            grid, graph, a_coord, t_coord = scen
 
             x = torch.cat((torch.FloatTensor(a_coord), torch.FloatTensor(t_coord))) / grid.shape[0]
 
@@ -129,15 +125,15 @@ def pyg(data_type: str, graph_type: str):
             data_list_P.append(Data(x=x, edge_index=edge_index, edge_attr=edge_attr_P))
 
         torch.save(data_list_A, 'datas/pyg/8_8_20_5_5/{}/A.pt'.format(data_type))
-        torch.save(data_list_M, 'datas/pyg/homo/8820_5_5_M.pt')
-        torch.save(data_list_P, 'datas/pyg/homo/8820_5_5_P.pt')
+        torch.save(data_list_M, 'datas/pyg/8_8_20_5_5/{}/M.pt'.format(data_type))
+        torch.save(data_list_P, 'datas/pyg/8_8_20_5_5/{}/P.pt'.format(data_type))
 
     elif graph_type == 'hetero':
         data_list = []
-        for s_id in trange(10000):
+        scenarios = torch.load('datas/scenarios/8_8_20_5_5/{}.pt'.format(data_type))
 
-            with open('datas/scenarios/8820_5_5_train/scenario_{}.pkl'.format(s_id), 'rb') as f:
-                grid, graph, a_coord, t_coord = pickle.load(f)
+        for scen in tqdm(scenarios):
+            grid, graph, a_coord, t_coord = scen
 
             src, dst = [], []
             for a_id in range(len(a_coord)):
@@ -181,7 +177,7 @@ def pyg(data_type: str, graph_type: str):
 
             data_list.append(data)
 
-        torch.save(data_list, 'datas/pyg/8820_5_5.pt')
+        torch.save(data_list, 'datas/pyg/8_8_20_5_5/{}/hetero.pt'.format(data_type))
 
     else:
         raise ValueError('supports only homogeneous and heterogeneous')
@@ -189,12 +185,14 @@ def pyg(data_type: str, graph_type: str):
 
 def main():
     seed_everything(seed=42)
-    data_list = torch.load('datas/pyg/8820_5_5.pt')
-    loader = DataLoader(dataset=data_list, batch_size=100, shuffle=True)
 
 
 if __name__ == '__main__':
-    # temp(OmegaConf.load('config/lns_itr_test.yaml'))
-    pyg(graph_type='homo')
-    pyg(graph_type='hetero')
+    # lns_itr_test(OmegaConf.load('config/lns_itr_test.yaml'))
+    pyg(data_type='train', graph_type='homo')
+    pyg(data_type='val', graph_type='homo')
+    pyg(data_type='test', graph_type='homo')
+    pyg(data_type='train', graph_type='hetero')
+    pyg(data_type='val', graph_type='hetero')
+    pyg(data_type='test', graph_type='hetero')
     # main()
