@@ -5,7 +5,7 @@ import networkx as nx
 import torch
 from torch import nn as nn
 
-from src.models.mpnn import MPNN, CompleteEdges
+from src.model.mpnn import MPNN, CompleteEdges
 
 
 def tempDestroy(assign, graph, removal):

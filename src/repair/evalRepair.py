@@ -11,11 +11,11 @@ import torch
 from tqdm import trange
 
 sys.path.append(os.path.dirname(os.path.abspath(os.path.dirname(__file__))))
-from src.heuristics.hungarian import hungarian
-from src.heuristics.regret import f_ijk, get_regret
-from src.heuristics.shaw import removal
+from src.heuristic.hungarian import hungarian
+from src.heuristic.regret import f_ijk, get_regret
+from src.heuristic.shaw import removal
 from utils.graph import sch_to_dgl
-from src.models.repair import NeuroRepair
+from src.model.repair import NeuroRepair
 from utils.scenario import load_scenarios
 from utils.solver import to_solver, solver
 from utils.solver import assignment_to_id

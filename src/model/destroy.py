@@ -5,7 +5,7 @@ import torch
 from lion_pytorch import Lion
 from torch import nn as nn
 
-from src.models.mpnn import MPNN
+from src.model.mpnn import MPNN
 
 
 def destroyGraph(graph, destroy, device):

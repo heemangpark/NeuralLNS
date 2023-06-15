@@ -8,14 +8,14 @@ import networkx as nx
 import numpy as np
 import torch
 from matplotlib import pyplot as plt
-from torch.utils.data import DataLoader
 from torch_geometric.data import Data, HeteroData
+from torch_geometric.loader import DataLoader
 from tqdm import tqdm, trange
 
 sys.path.append(os.path.dirname(os.path.abspath(os.path.dirname(__file__))))
-from src.heuristics.hungarian import hungarian
-from src.heuristics.regret import f_ijk
-from src.heuristics.shaw import removal
+from src.heuristic.hungarian import hungarian
+from src.heuristic.regret import f_ijk
+from src.heuristic.shaw import removal
 from utils.scenario import load_scenarios
 from utils.seed import seed_everything
 from utils.solver import solver
@@ -195,8 +195,9 @@ def run():
 
     # Training Loop
     for e in trange(100):  # config_epochs
-        for graph in train_loader:
-            pred = model(graph)
+        for batch in train_loader:
+            eg = batch.to_data_list()[0]
+            pred = model(batch)
             label = 0  # label: call solver
             loss = criterion(pred, label)
 

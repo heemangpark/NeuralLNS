@@ -2,7 +2,7 @@ import dgl
 import torch
 from torch import nn as nn
 
-from src.models.mpnn import MPNN
+from src.model.mpnn import MPNN
 
 
 class MLP(nn.Module):

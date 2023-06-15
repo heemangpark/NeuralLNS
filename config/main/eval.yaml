@@ -1,6 +1,6 @@
 cand_size: 10
 device: cuda:2
-dir: datas/models/
+dir: datas/model/
 num_eval: 2000
 seed: 42
 save_dir: PBS/eval/
