@@ -8,8 +8,9 @@ import networkx as nx
 import numpy as np
 import torch
 from matplotlib import pyplot as plt
+from torch.utils.data import DataLoader
 from torch_geometric.data import Data, HeteroData
-from tqdm import tqdm
+from tqdm import tqdm, trange
 
 sys.path.append(os.path.dirname(os.path.abspath(os.path.dirname(__file__))))
 from src.heuristics.hungarian import hungarian
@@ -183,16 +184,33 @@ def pyg(data_type: str, graph_type: str):
         raise ValueError('supports only homogeneous and heterogeneous')
 
 
-def main():
+def run():
     seed_everything(seed=42)
+    train_data = torch.load('datas/pyg/8_8_20_5_5/train/P.pt')
+    train_loader = DataLoader(train_data, batch_size=100, shuffle=True)
+
+    model = ()
+    criterion = ()
+    optimizer = ()
+
+    # Training Loop
+    for e in trange(100):  # config_epochs
+        for graph in train_loader:
+            pred = model(graph)
+            label = 0  # label: call solver
+            loss = criterion(pred, label)
+
+            optimizer.zero_grad()
+            loss.backward()
+            optimizer.step()
 
 
 if __name__ == '__main__':
     # lns_itr_test(OmegaConf.load('config/lns_itr_test.yaml'))
-    pyg(data_type='train', graph_type='homo')
-    pyg(data_type='val', graph_type='homo')
-    pyg(data_type='test', graph_type='homo')
-    pyg(data_type='train', graph_type='hetero')
-    pyg(data_type='val', graph_type='hetero')
-    pyg(data_type='test', graph_type='hetero')
-    # main()
+    # pyg(data_type='train', graph_type='homo')
+    # pyg(data_type='val', graph_type='homo')
+    # pyg(data_type='test', graph_type='homo')
+    # pyg(data_type='train', graph_type='hetero')
+    # pyg(data_type='val', graph_type='hetero')
+    # pyg(data_type='test', graph_type='hetero')
+    run()
