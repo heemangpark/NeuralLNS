@@ -29,7 +29,7 @@ class MPNN(nn.Module):
         self.model_dim = model_dim
 
     def forward(self, batch: Batch):
-        nf, e_id, ef = batch.x, batch.edge_attr, batch.edge_index
+        nf, e_id, ef = batch.x, batch.edge_index, batch.edge_attr
         nf, ef = self.node_enc(nf), self.edge_enc(ef)
 
         if self.num_layers <= 0:

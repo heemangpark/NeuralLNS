@@ -91,95 +91,97 @@ def lns_itr_test(cfg):
         plt.clf()
 
 
-def pyg(data_type: str, graph_type: str):
+def pyg(graph_type: str):
     if graph_type == 'homo':
-        data_list_A, data_list_M, data_list_P = [], [], []
-        scenarios = torch.load('datas/scenarios/8_8_20_5_5/{}.pt'.format(data_type))
+        for data_type in ['train', 'val', 'test']:
+            data_list_A, data_list_M, data_list_P = [], [], []
+            scenarios = torch.load('datas/scenarios/8_8_20_5_5/{}.pt'.format(data_type))
 
-        for scen in tqdm(scenarios):
-            grid, graph, a_coord, t_coord = scen
+            for scen in tqdm(scenarios):
+                grid, graph, a_coord, t_coord = scen
 
-            x = torch.cat((torch.FloatTensor(a_coord), torch.FloatTensor(t_coord))) / grid.shape[0]
+                x = torch.cat((torch.FloatTensor(a_coord), torch.FloatTensor(t_coord))) / grid.shape[0]
 
-            src, dst = [], []
-            for a_id in range(len(a_coord)):
-                for t_id in range(len(a_coord), len(a_coord) + len(t_coord)):
-                    src.extend([a_id, t_id])
-                    dst.extend([t_id, a_id])
-            edge_index = torch.LongTensor([src, dst])
+                src, dst = [], []
+                for a_id in range(len(a_coord)):
+                    for t_id in range(len(a_coord), len(a_coord) + len(t_coord)):
+                        src.extend([a_id, t_id])
+                        dst.extend([t_id, a_id])
+                edge_index = torch.LongTensor([src, dst])
 
-            A, M, P = [], [], []
-            for _a in a_coord:
-                for _t in t_coord:
-                    astar = nx.astar_path_length(graph, tuple(_a), tuple(_t)) / grid.shape[0]
-                    man = sum(abs(np.array(_a) - np.array(_t))) / grid.shape[0]
-                    proxy = astar - man
-                    A.extend([astar] * 2)
-                    M.extend([man] * 2)
-                    P.extend([proxy] * 2)
+                A, M, P = [], [], []
+                for _a in a_coord:
+                    for _t in t_coord:
+                        astar = nx.astar_path_length(graph, tuple(_a), tuple(_t)) / grid.shape[0]
+                        man = sum(abs(np.array(_a) - np.array(_t))) / grid.shape[0]
+                        proxy = astar - man
+                        A.extend([astar] * 2)
+                        M.extend([man] * 2)
+                        P.extend([proxy] * 2)
 
-            edge_attr_A = torch.FloatTensor(A)
-            edge_attr_M = torch.FloatTensor(M)
-            edge_attr_P = torch.FloatTensor(P)
+                edge_attr_A = torch.FloatTensor(A).view(-1, 1)
+                edge_attr_M = torch.FloatTensor(M).view(-1, 1)
+                edge_attr_P = torch.FloatTensor(P).view(-1, 1)
 
-            data_list_A.append(Data(x=x, edge_index=edge_index, edge_attr=edge_attr_A))
-            data_list_M.append(Data(x=x, edge_index=edge_index, edge_attr=edge_attr_M))
-            data_list_P.append(Data(x=x, edge_index=edge_index, edge_attr=edge_attr_P))
+                data_list_A.append(Data(x=x, edge_index=edge_index, edge_attr=edge_attr_A))
+                data_list_M.append(Data(x=x, edge_index=edge_index, edge_attr=edge_attr_M))
+                data_list_P.append(Data(x=x, edge_index=edge_index, edge_attr=edge_attr_P))
 
-        torch.save(data_list_A, 'datas/pyg/8_8_20_5_5/{}/A.pt'.format(data_type))
-        torch.save(data_list_M, 'datas/pyg/8_8_20_5_5/{}/M.pt'.format(data_type))
-        torch.save(data_list_P, 'datas/pyg/8_8_20_5_5/{}/P.pt'.format(data_type))
+            torch.save(data_list_A, 'datas/pyg/8_8_20_5_5/{}/A.pt'.format(data_type))
+            torch.save(data_list_M, 'datas/pyg/8_8_20_5_5/{}/M.pt'.format(data_type))
+            torch.save(data_list_P, 'datas/pyg/8_8_20_5_5/{}/P.pt'.format(data_type))
 
     elif graph_type == 'hetero':
-        data_list = []
-        scenarios = torch.load('datas/scenarios/8_8_20_5_5/{}.pt'.format(data_type))
+        for data_type in ['train', 'val', 'test']:
+            data_list = []
+            scenarios = torch.load('datas/scenarios/8_8_20_5_5/{}.pt'.format(data_type))
 
-        for scen in tqdm(scenarios):
-            grid, graph, a_coord, t_coord = scen
+            for scen in tqdm(scenarios):
+                grid, graph, a_coord, t_coord = scen
 
-            src, dst = [], []
-            for a_id in range(len(a_coord)):
-                for t_id in range(len(a_coord), len(a_coord) + len(t_coord)):
-                    src.extend([a_id, t_id])
-                    dst.extend([t_id, a_id])
-            edge_index = torch.LongTensor([src, dst])
+                src, dst = [], []
+                for a_id in range(len(a_coord)):
+                    for t_id in range(len(a_coord), len(a_coord) + len(t_coord)):
+                        src.extend([a_id, t_id])
+                        dst.extend([t_id, a_id])
+                edge_index = torch.LongTensor([src, dst])
 
-            A, M, P = [], [], []
-            for _a in a_coord:
-                for _t in t_coord:
-                    astar = nx.astar_path_length(graph, tuple(_a), tuple(_t)) / grid.shape[0]
-                    man = sum(abs(np.array(_a) - np.array(_t))) / grid.shape[0]
-                    proxy = astar - man
-                    A.extend([astar] * 2)
-                    M.extend([man] * 2)
-                    P.extend([proxy] * 2)
+                A, M, P = [], [], []
+                for _a in a_coord:
+                    for _t in t_coord:
+                        astar = nx.astar_path_length(graph, tuple(_a), tuple(_t)) / grid.shape[0]
+                        man = sum(abs(np.array(_a) - np.array(_t))) / grid.shape[0]
+                        proxy = astar - man
+                        A.extend([astar] * 2)
+                        M.extend([man] * 2)
+                        P.extend([proxy] * 2)
 
-            edge_attr_1 = torch.FloatTensor(A)
-            edge_attr_2 = torch.FloatTensor(M)
-            edge_attr_3 = torch.FloatTensor(P)
+                edge_attr_1 = torch.FloatTensor(A).view(-1, 1)
+                edge_attr_2 = torch.FloatTensor(M).view(-1, 1)
+                edge_attr_3 = torch.FloatTensor(P).view(-1, 1)
 
-            data = HeteroData()
-            data['agent'].x = torch.FloatTensor(a_coord) / grid.shape[0]
-            data['task'].x = torch.FloatTensor(t_coord) / grid.shape[0]
+                data = HeteroData()
+                data['agent'].x = torch.FloatTensor(a_coord) / grid.shape[0]
+                data['task'].x = torch.FloatTensor(t_coord) / grid.shape[0]
 
-            data['agent', 'astar', 'task'].edge_index = edge_index
-            data['task', 'astar', 'agent'].edge_index = edge_index
-            data['agent', 'astar', 'task'].edge_attr = edge_attr_1
-            data['task', 'astar', 'agent'].edge_attr = edge_attr_1
+                data['agent', 'astar', 'task'].edge_index = edge_index
+                data['task', 'astar', 'agent'].edge_index = edge_index
+                data['agent', 'astar', 'task'].edge_attr = edge_attr_1
+                data['task', 'astar', 'agent'].edge_attr = edge_attr_1
 
-            data['agent', 'man', 'task'].edge_index = edge_index
-            data['task', 'man', 'agent'].edge_index = edge_index
-            data['agent', 'man', 'task'].edge_attr = edge_attr_2
-            data['task', 'man', 'agent'].edge_attr = edge_attr_2
+                data['agent', 'man', 'task'].edge_index = edge_index
+                data['task', 'man', 'agent'].edge_index = edge_index
+                data['agent', 'man', 'task'].edge_attr = edge_attr_2
+                data['task', 'man', 'agent'].edge_attr = edge_attr_2
 
-            data['agent', 'proxy', 'task'].edge_index = edge_index
-            data['task', 'proxy', 'agent'].edge_index = edge_index
-            data['agent', 'proxy', 'task'].edge_attr = edge_attr_3
-            data['task', 'proxy', 'agent'].edge_attr = edge_attr_3
+                data['agent', 'proxy', 'task'].edge_index = edge_index
+                data['task', 'proxy', 'agent'].edge_index = edge_index
+                data['agent', 'proxy', 'task'].edge_attr = edge_attr_3
+                data['task', 'proxy', 'agent'].edge_attr = edge_attr_3
 
-            data_list.append(data)
+                data_list.append(data)
 
-        torch.save(data_list, 'datas/pyg/8_8_20_5_5/{}/hetero.pt'.format(data_type))
+            torch.save(data_list, 'datas/pyg/8_8_20_5_5/{}/hetero.pt'.format(data_type))
 
     else:
         raise ValueError('supports only homogeneous and heterogeneous')
@@ -190,21 +192,17 @@ def run():
     train_data = torch.load('datas/pyg/8_8_20_5_5/train/P.pt')
     train_loader = DataLoader(train_data, batch_size=100, shuffle=True)
 
-    GNN = MPNN(8, 8, 32, 3)  # config/model/MPNN.yaml
+    GNN = MPNN(2, 1, 32, 3)  # config/model/MPNN.yaml
 
     # Training Loop
     for e in trange(100):  # config/main/temp.yaml_epochs
         for batch in train_loader:
             eg = batch.to_data_list()[0]
-            embedding = GNN(batch)
+            embedding = GNN(eg)
 
 
 if __name__ == '__main__':
     # lns_itr_test(OmegaConf.load('config/lns_itr_test.yaml'))
-    # pyg(data_type='train', graph_type='homo')
-    # pyg(data_type='val', graph_type='homo')
-    # pyg(data_type='test', graph_type='homo')
-    # pyg(data_type='train', graph_type='hetero')
-    # pyg(data_type='val', graph_type='hetero')
-    # pyg(data_type='test', graph_type='hetero')
+    # pyg(graph_type='homo')
+    # pyg(graph_type='hetero')
     run()
