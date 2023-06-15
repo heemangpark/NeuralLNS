@@ -16,6 +16,7 @@ sys.path.append(os.path.dirname(os.path.abspath(os.path.dirname(__file__))))
 from src.heuristic.hungarian import hungarian
 from src.heuristic.regret import f_ijk
 from src.heuristic.shaw import removal
+from src.model.pyg_mpnn import MPNN
 from utils.scenario import load_scenarios
 from utils.seed import seed_everything
 from utils.solver import solver
@@ -189,21 +190,13 @@ def run():
     train_data = torch.load('datas/pyg/8_8_20_5_5/train/P.pt')
     train_loader = DataLoader(train_data, batch_size=100, shuffle=True)
 
-    model = ()
-    criterion = ()
-    optimizer = ()
+    GNN = MPNN(8, 8, 32, 3)  # config/model/MPNN.yaml
 
     # Training Loop
-    for e in trange(100):  # config_epochs
+    for e in trange(100):  # config/main/temp.yaml_epochs
         for batch in train_loader:
             eg = batch.to_data_list()[0]
-            pred = model(batch)
-            label = 0  # label: call solver
-            loss = criterion(pred, label)
-
-            optimizer.zero_grad()
-            loss.backward()
-            optimizer.step()
+            embedding = GNN(batch)
 
 
 if __name__ == '__main__':
