@@ -9,9 +9,9 @@ import networkx as nx
 import numpy as np
 import torch
 from matplotlib import pyplot as plt
-from torch_geometric.data import Data
+from torch_geometric.data import Data, HeteroData
 from torch_geometric.loader import DataLoader
-from tqdm import tqdm
+from tqdm import tqdm, trange
 
 sys.path.append(os.path.dirname(os.path.abspath(os.path.dirname(__file__))))
 from src.heuristics.hungarian import hungarian
@@ -91,33 +91,110 @@ def lns_itr_test(cfg):
         plt.clf()
 
 
-def pyg_8820_5_5():
-    data_list = []
+def pyg(data_type: str, graph_type: str):
+    if graph_type == 'homo':
+        data_list_A, data_list_M, data_list_P = [], [], []
 
-    for s_id in range(10000):
-        with open('datas/scenarios/8820_5_5_train/scenario_{}.pkl'.format(s_id), 'rb') as f:
-            grid, graph, a_coord, t_coord = pickle.load(f)
+        scen_dir = 'datas/scenarios/8820_5_5_{}/'.format(data_type)
+        for s_id in trange(next(os.walk(scen_dir))[2]):
 
-        x = torch.cat((torch.FloatTensor(a_coord), torch.FloatTensor(t_coord))) / grid.shape[0]
+            with open(scen_dir + 'scenario_{}.pkl'.format(s_id), 'rb') as f:
+                grid, graph, a_coord, t_coord = pickle.load(f)
 
-        edge_index = torch.LongTensor([[r, c, c, r] for r in range(len(a_coord))
-                                       for c in range(len(a_coord), len(a_coord) + len(t_coord))]).view(-1, 2)
+            x = torch.cat((torch.FloatTensor(a_coord), torch.FloatTensor(t_coord))) / grid.shape[0]
 
-        edge_attr = torch.Tensor([[nx.astar_path_length(graph, tuple(_a), tuple(_t)) / grid.shape[0]] * 2
-                                  for _a in a_coord for _t in t_coord]).flatten()
+            src, dst = [], []
+            for a_id in range(len(a_coord)):
+                for t_id in range(len(a_coord), len(a_coord) + len(t_coord)):
+                    src.extend([a_id, t_id])
+                    dst.extend([t_id, a_id])
+            edge_index = torch.LongTensor([src, dst])
 
-        data_list.append(Data(x=x, edge_index=edge_index, edge_attr=edge_attr))
+            A, M, P = [], [], []
+            for _a in a_coord:
+                for _t in t_coord:
+                    astar = nx.astar_path_length(graph, tuple(_a), tuple(_t)) / grid.shape[0]
+                    man = sum(abs(np.array(_a) - np.array(_t))) / grid.shape[0]
+                    proxy = astar - man
+                    A.extend([astar] * 2)
+                    M.extend([man] * 2)
+                    P.extend([proxy] * 2)
 
-    torch.save(data_list, 'datas/pyg/8820_5_5.pt')
+            edge_attr_A = torch.FloatTensor(A)
+            edge_attr_M = torch.FloatTensor(M)
+            edge_attr_P = torch.FloatTensor(P)
+
+            data_list_A.append(Data(x=x, edge_index=edge_index, edge_attr=edge_attr_A))
+            data_list_M.append(Data(x=x, edge_index=edge_index, edge_attr=edge_attr_M))
+            data_list_P.append(Data(x=x, edge_index=edge_index, edge_attr=edge_attr_P))
+
+        torch.save(data_list_A, 'datas/pyg/8_8_20_5_5/{}/A.pt'.format(data_type))
+        torch.save(data_list_M, 'datas/pyg/homo/8820_5_5_M.pt')
+        torch.save(data_list_P, 'datas/pyg/homo/8820_5_5_P.pt')
+
+    elif graph_type == 'hetero':
+        data_list = []
+        for s_id in trange(10000):
+
+            with open('datas/scenarios/8820_5_5_train/scenario_{}.pkl'.format(s_id), 'rb') as f:
+                grid, graph, a_coord, t_coord = pickle.load(f)
+
+            src, dst = [], []
+            for a_id in range(len(a_coord)):
+                for t_id in range(len(a_coord), len(a_coord) + len(t_coord)):
+                    src.extend([a_id, t_id])
+                    dst.extend([t_id, a_id])
+            edge_index = torch.LongTensor([src, dst])
+
+            A, M, P = [], [], []
+            for _a in a_coord:
+                for _t in t_coord:
+                    astar = nx.astar_path_length(graph, tuple(_a), tuple(_t)) / grid.shape[0]
+                    man = sum(abs(np.array(_a) - np.array(_t))) / grid.shape[0]
+                    proxy = astar - man
+                    A.extend([astar] * 2)
+                    M.extend([man] * 2)
+                    P.extend([proxy] * 2)
+
+            edge_attr_1 = torch.FloatTensor(A)
+            edge_attr_2 = torch.FloatTensor(M)
+            edge_attr_3 = torch.FloatTensor(P)
+
+            data = HeteroData()
+            data['agent'].x = torch.FloatTensor(a_coord) / grid.shape[0]
+            data['task'].x = torch.FloatTensor(t_coord) / grid.shape[0]
+
+            data['agent', 'astar', 'task'].edge_index = edge_index
+            data['task', 'astar', 'agent'].edge_index = edge_index
+            data['agent', 'astar', 'task'].edge_attr = edge_attr_1
+            data['task', 'astar', 'agent'].edge_attr = edge_attr_1
+
+            data['agent', 'man', 'task'].edge_index = edge_index
+            data['task', 'man', 'agent'].edge_index = edge_index
+            data['agent', 'man', 'task'].edge_attr = edge_attr_2
+            data['task', 'man', 'agent'].edge_attr = edge_attr_2
+
+            data['agent', 'proxy', 'task'].edge_index = edge_index
+            data['task', 'proxy', 'agent'].edge_index = edge_index
+            data['agent', 'proxy', 'task'].edge_attr = edge_attr_3
+            data['task', 'proxy', 'agent'].edge_attr = edge_attr_3
+
+            data_list.append(data)
+
+        torch.save(data_list, 'datas/pyg/8820_5_5.pt')
+
+    else:
+        raise ValueError('supports only homogeneous and heterogeneous')
 
 
 def main():
+    seed_everything(seed=42)
     data_list = torch.load('datas/pyg/8820_5_5.pt')
-    loader = DataLoader(data_list)
-    debug = 1
+    loader = DataLoader(dataset=data_list, batch_size=100, shuffle=True)
 
 
 if __name__ == '__main__':
     # temp(OmegaConf.load('config/lns_itr_test.yaml'))
-    # pyg_8820_5_5()
-    main()
+    pyg(graph_type='homo')
+    pyg(graph_type='hetero')
+    # main()
