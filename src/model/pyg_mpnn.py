@@ -16,26 +16,21 @@ class MPNN(nn.Module):
             residual: bool = True,
     ):
         super().__init__()
+
         self.node_enc = nn.Linear(n_enc_dim, model_dim)
         self.edge_enc = nn.Linear(e_enc_dim, model_dim)
-
-        self.num_layers = num_layers
-        if self.num_layers == 0:  # Layer sharing
-            self.graph_conv = MPLayer(node_aggr, model_dim, act, residual)
-        else:
-            self.graph_convs = nn.ModuleList([MPLayer(node_aggr, model_dim, act, residual)])
-
         self.dec = nn.Linear(2 * model_dim, e_enc_dim)
-        self.model_dim = model_dim
+
+        self.graph_convs = nn.ModuleList([MPLayer(node_aggr, model_dim, act, residual)
+                                          for _ in range(num_layers)])
+
+        self.residual = residual
 
     def forward(self, batch: Batch):
         nf, e_id, ef = batch.x, batch.edge_index, batch.edge_attr
         nf, ef = self.node_enc(nf), self.edge_enc(ef)
 
-        if self.num_layers <= 0:
-            raise NotImplementedError("Layer sharing is not implemented yet.")
-        else:
-            for graph_conv in self.graph_convs:
-                nf = graph_conv(nf, e_id, ef)
+        for graph_conv in self.graph_convs:
+            nf = graph_conv(nf, e_id, ef)
 
         return self.dec(nf)

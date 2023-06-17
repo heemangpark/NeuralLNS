@@ -199,6 +199,7 @@ def run():
         for batch in train_loader:
             eg = batch.to_data_list()[0]
             embedding = GNN(eg)
+            print(embedding.shape)
 
 
 if __name__ == '__main__':
