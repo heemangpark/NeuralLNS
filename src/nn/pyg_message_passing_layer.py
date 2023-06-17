@@ -5,7 +5,7 @@ from torch_geometric.nn import MessagePassing
 
 class MPLayer(MessagePassing):
     def __init__(self, node_aggr: str, dim: int, act: str, residual: bool):
-        super().__init__(aggr=node_aggr)
+        super(MPLayer, self).__init__(aggr=node_aggr)
 
         self.update_func = nn.Sequential(nn.Linear(2 * dim, dim), getattr(nn, act)())
         self.residual = residual
