@@ -1,3 +1,4 @@
+import argparse
 import copy
 import os
 import random
@@ -274,6 +275,7 @@ def run(exp_type: str):
 if __name__ == '__main__':
     # pyg_data(graph_type='homo')
     # pyg_data(graph_type='hetero')
-    run('A')
-    run('M')
-    run('P')
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--exp_type')
+    args = parser.parse_args()
+    run(args.exp_type)
