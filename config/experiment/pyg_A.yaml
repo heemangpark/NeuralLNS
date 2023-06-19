@@ -4,4 +4,4 @@ batch_size: 1000
 device: cuda:0
 edge_type: A
 epochs: 100
-wandb: False
+wandb: True
