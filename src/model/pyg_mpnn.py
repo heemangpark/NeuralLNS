@@ -1,31 +1,21 @@
 import torch.nn as nn
 from torch_geometric.data import Batch
 
-from src.nn.pyg_message_passing_layer import MPLayer
+from src.nn.pyg_mp_layer import MPLayer
 
 
 class MPNN(nn.Module):
-    def __init__(
-            self,
-            n_enc_dim: int,
-            e_enc_dim: int,
-            model_dim: int,
-            num_layers: int,
-            node_aggr: str = "add",
-            act: str = "ReLU",
-            residual: bool = True,
-    ):
+    def __init__(self, config):
         super().__init__()
 
-        self.node_enc = nn.Linear(n_enc_dim, model_dim)
-        self.edge_enc = nn.Linear(e_enc_dim, model_dim)
-        self.dec = nn.Linear(model_dim, 1)
+        self.node_enc = nn.Linear(config.n_enc_dim, config.model_dim)
+        self.edge_enc = nn.Linear(config.e_enc_dim, config.model_dim)
+        self.dec = nn.Linear(config.model_dim, 1)
 
-        self.graph_convs = nn.ModuleList([MPLayer(node_aggr, model_dim, act, residual)
-                                          for _ in range(num_layers)])
+        self.graph_convs = nn.ModuleList([MPLayer(config.node_aggr, config.model_dim, config.act, config.residual)
+                                          for _ in range(config.num_layers)])
 
-        self.model_dim = model_dim
-        self.residual = residual
+        self.to(config.device)
 
     def forward(self, batch: Batch):
         B = batch.num_graphs

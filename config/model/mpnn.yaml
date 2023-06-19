@@ -1,0 +1,10 @@
+# Torch Geometric MPNN Configuration
+
+n_enc_dim: 2
+e_enc_dim: 1
+model_dim: 32
+num_layers: 3
+node_aggr: add
+act: ReLU
+residual: True
+device: cuda:0

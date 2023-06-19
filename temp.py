@@ -8,6 +8,7 @@ import networkx as nx
 import numpy as np
 import torch
 from matplotlib import pyplot as plt
+from omegaconf import OmegaConf
 from torch_geometric.data import Data, HeteroData
 from torch_geometric.loader import DataLoader
 from tqdm import tqdm, trange
@@ -16,7 +17,7 @@ sys.path.append(os.path.dirname(os.path.abspath(os.path.dirname(__file__))))
 from src.heuristic.hungarian import hungarian
 from src.heuristic.regret import f_ijk
 from src.heuristic.shaw import removal
-from src.model.cross_attention import CrossAttention
+from src.model.attention import MultiHeadCrossAttention
 from src.model.pyg_mpnn import MPNN
 from utils.scenario import load_scenarios
 from utils.seed import seed_everything
@@ -193,8 +194,10 @@ def run():
     train_data = torch.load('datas/pyg/8_8_20_5_5/train/P.pt')
     train_loader = DataLoader(train_data, batch_size=100, shuffle=True)
 
-    gnn = MPNN(n_enc_dim=2, e_enc_dim=1, model_dim=32, num_layers=3)  # config/model/gnn.yaml
-    attn = CrossAttention(embed_dim=32, num_heads=4)  # config/model/attention.yaml
+    gnn_config = OmegaConf.load('config/model/mpnn.yaml')
+    attn_config = OmegaConf.load('config/model/attention.yaml')
+    gnn = MPNN(gnn_config)
+    attn = MultiHeadCrossAttention(attn_config)
 
     # Training Loop
     for e in trange(100):  # config/main/temp.yaml_epochs
