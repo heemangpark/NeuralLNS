@@ -102,7 +102,7 @@ def pyg_data(graph_type: str, scen_config: str):
 
             data_list_A, data_list_M, data_list_P = [], [], []
             scenarios = torch.load('datas/scenarios/{}/{}.pt'.format(scen_config, data_type))
-            #  scen_config  8_8_20_5_5  16_16_20_5_20  32_32_5_50
+            #  scen_config  8_8_20_5_5  16_16_20_10_10  32_32_10_10
 
             for scen in tqdm(scenarios):
                 grid, graph, a_coord, t_coord, y = scen
@@ -268,3 +268,6 @@ if __name__ == '__main__':
     parser.add_argument('--exp_type', '-t')
     args = parser.parse_args()
     run(args.exp_type)
+
+    # pyg_data(graph_type='homo', scen_config='8_8_20_5_5')
+    # pyg_data(graph_type='homo', scen_config='16_16_20_10_10')
