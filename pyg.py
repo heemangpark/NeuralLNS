@@ -207,6 +207,10 @@ def pyg_data(graph_type: str, scen_config: str):
 def run(exp_type: str):
     seed_everything(seed=42)
     date = datetime.now().strftime("%m%d_%H%M%S")
+    model_dir = 'datas/model/{}/'.format(date)
+    if not os.path.exists(model_dir):
+        os.makedirs(model_dir)
+
     exp_config = OmegaConf.load('config/experiment/pyg_{}.yaml'.format(exp_type))
 
     train_data = torch.load('datas/pyg/{}/train/{}.pt'.format(exp_config.exp, exp_config.edge_type),
@@ -244,10 +248,10 @@ def run(exp_type: str):
             wandb.log({'epoch_loss': epoch_loss})
 
         if (e + 1) % 10 == 0:
-            torch.save(gnn.state_dict(), '{}_{}.pt'.format(exp_config.edge_type, e + 1))
+            torch.save(gnn.state_dict(), model_dir + '{}_{}.pt'.format(exp_config.edge_type, e + 1))
 
             val_gnn = MPNN(gnn_config).to(exp_config.device)
-            val_gnn.load_state_dict(torch.load('{}_{}.pt'.format(exp_config.edge_type, e + 1)))
+            val_gnn.load_state_dict(torch.load(model_dir + '{}_{}.pt'.format(exp_config.edge_type, e + 1)))
             val_gnn.eval()
 
             val_loss, num_batch = 0, 0
