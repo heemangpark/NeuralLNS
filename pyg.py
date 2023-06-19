@@ -214,10 +214,10 @@ def pyg_data(graph_type: str):
         raise ValueError('supports only homogeneous and heterogeneous graphs')
 
 
-def run():
+def run(exp_type: str):
     seed_everything(seed=42)
     date = datetime.now().strftime("%m%d_%H%M%S")
-    exp_config = OmegaConf.load('config/experiment/pyg_A.yaml')
+    exp_config = OmegaConf.load('config/experiment/pyg_{}.yaml'.format(exp_type))
 
     train_data = torch.load('datas/pyg/8_8_20_5_5/train/{}.pt'.format(exp_config.edge_type))
     val_data = torch.load('datas/pyg/8_8_20_5_5/val/{}.pt'.format(exp_config.edge_type))
@@ -274,4 +274,6 @@ def run():
 if __name__ == '__main__':
     # pyg_data(graph_type='homo')
     # pyg_data(graph_type='hetero')
-    run()
+    run('A')
+    run('M')
+    run('P')
