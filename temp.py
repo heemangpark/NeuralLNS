@@ -102,7 +102,7 @@ def pyg(graph_type: str):
 
             for scen in tqdm(scenarios):
                 grid, graph, a_coord, t_coord = scen
-                scen_cost = one_step_solver(grid, a_coord, t_coord, 'PBS/pyg/', '_')
+                y = one_step_solver(grid, a_coord, t_coord, 'PBS/pyg/', '_')
 
                 x = torch.cat((torch.FloatTensor(a_coord), torch.FloatTensor(t_coord))) / grid.shape[0]
 
@@ -127,9 +127,9 @@ def pyg(graph_type: str):
                 edge_attr_M = torch.FloatTensor(M).view(-1, 1)
                 edge_attr_P = torch.FloatTensor(P).view(-1, 1)
 
-                data_list_A.append(Data(x=x, edge_index=edge_index, edge_attr=edge_attr_A))
-                data_list_M.append(Data(x=x, edge_index=edge_index, edge_attr=edge_attr_M))
-                data_list_P.append(Data(x=x, edge_index=edge_index, edge_attr=edge_attr_P))
+                data_list_A.append(Data(x=x, edge_index=edge_index, edge_attr=edge_attr_A, y=y))
+                data_list_M.append(Data(x=x, edge_index=edge_index, edge_attr=edge_attr_M, y=y))
+                data_list_P.append(Data(x=x, edge_index=edge_index, edge_attr=edge_attr_P, y=y))
 
             torch.save(data_list_A, 'datas/pyg/8_8_20_5_5/{}/A.pt'.format(data_type))
             torch.save(data_list_M, 'datas/pyg/8_8_20_5_5/{}/M.pt'.format(data_type))
@@ -142,7 +142,7 @@ def pyg(graph_type: str):
 
             for scen in tqdm(scenarios):
                 grid, graph, a_coord, t_coord = scen
-                scen_cost = one_step_solver(grid, a_coord, t_coord, 'PBS/pyg/', '_')
+                y = one_step_solver(grid, a_coord, t_coord, 'PBS/pyg/', '_')
 
                 src, dst = [], []
                 for a_id in range(len(a_coord)):
@@ -170,19 +170,28 @@ def pyg(graph_type: str):
                 data['task'].x = torch.FloatTensor(t_coord) / grid.shape[0]
 
                 data['agent', 'astar', 'task'].edge_index = edge_index
-                data['task', 'astar', 'agent'].edge_index = edge_index
                 data['agent', 'astar', 'task'].edge_attr = edge_attr_1
+                data['agent', 'astar', 'task'].y = y
+
+                data['task', 'astar', 'agent'].edge_index = edge_index
                 data['task', 'astar', 'agent'].edge_attr = edge_attr_1
+                data['task', 'astar', 'agent'].y = y
 
                 data['agent', 'man', 'task'].edge_index = edge_index
-                data['task', 'man', 'agent'].edge_index = edge_index
                 data['agent', 'man', 'task'].edge_attr = edge_attr_2
+                data['agent', 'man', 'task'].y = y
+
+                data['task', 'man', 'agent'].edge_index = edge_index
                 data['task', 'man', 'agent'].edge_attr = edge_attr_2
+                data['task', 'man', 'agent'].y = y
 
                 data['agent', 'proxy', 'task'].edge_index = edge_index
-                data['task', 'proxy', 'agent'].edge_index = edge_index
                 data['agent', 'proxy', 'task'].edge_attr = edge_attr_3
+                data['agent', 'proxy', 'task'].y = y
+
+                data['task', 'proxy', 'agent'].edge_index = edge_index
                 data['task', 'proxy', 'agent'].edge_attr = edge_attr_3
+                data['task', 'proxy', 'agent'].y = y
 
                 data_list.append(data)
 
@@ -217,4 +226,5 @@ def run():
 
 if __name__ == '__main__':
     pyg(graph_type='homo')
-    run()
+    pyg(graph_type='hetero')
+    # run()
