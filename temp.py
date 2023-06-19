@@ -200,7 +200,7 @@ def run():
     attn = MultiHeadCrossAttention(attn_config)
 
     # Training Loop
-    for e in trange(100):  # config/main/temp.yaml_epochs
+    for e in trange(100):  # config/experiment/temp.yaml_epochs
         for batch in train_loader:
             hidden = gnn(batch)
             hidden_a, hidden_t = hidden[:, :5, :], hidden[:, 5:, :]
