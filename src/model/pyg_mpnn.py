@@ -19,8 +19,6 @@ class MPNN(nn.Module):
         self.loss = nn.MSELoss()
         self.optimizer = Lion(self.parameters(), lr=config.optimizer.lr, weight_decay=config.optimizer.wd)
 
-        self.to(config.device)
-
     def forward(self, batch: Batch):
         B = batch.num_graphs
 

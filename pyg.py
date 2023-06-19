@@ -20,6 +20,7 @@ from src.heuristic.regret import f_ijk
 from src.heuristic.shaw import removal
 from src.model.attention import MultiHeadCrossAttention
 from src.model.pyg_mpnn import MPNN
+from utils.prefetch_loader import PrefetchLoader
 from utils.scenario import load_scenarios
 from utils.seed import seed_everything
 from utils.solver import solver
@@ -222,20 +223,23 @@ def run():
     val_data = torch.load('datas/pyg/8_8_20_5_5/val/{}.pt'.format(exp_config.edge_type))
     # test_data = torch.load('datas/pyg/8_8_20_5_5/test/{}.pt'.format(exp_config.edge_type))
 
-    train_loader = DataLoader(train_data, batch_size=exp_config.batch_size, shuffle=True)
-    val_loader = DataLoader(val_data, batch_size=exp_config.batch_size, shuffle=True)
-    # test_loader = DataLoader(test_data, batch_size=exp_config.batch_size, shuffle=True)
+    train_loader = PrefetchLoader(loader=DataLoader(train_data, batch_size=exp_config.batch_size, shuffle=True),
+                                  device=exp_config.device)
+    val_loader = PrefetchLoader(loader=DataLoader(val_data, batch_size=exp_config.batch_size, shuffle=True),
+                                device=exp_config.device)
+    # test_loader = PrefetchLoader(loader=DataLoader(test_data, batch_size=exp_config.batch_size, shuffle=True),
+    #                              device=exp_config.device)
 
     gnn_config = OmegaConf.load('config/model/mpnn.yaml')
     attn_config = OmegaConf.load('config/model/attention.yaml')
 
     if exp_config.wandb:
         import wandb
-        wandb_config = dict(setup=exp_config, params=gnn_config)
+        wandb_config = dict(exp_setup=exp_config, params=gnn_config)
         wandb.init(project='NeuralLNS', name=date, config=wandb_config)
 
-    gnn = MPNN(gnn_config)
-    attn = MultiHeadCrossAttention(attn_config)
+    gnn = MPNN(gnn_config).to(exp_config.device)
+    attn = MultiHeadCrossAttention(attn_config).to(exp_config.device)
 
     for e in trange(exp_config.epochs):
         epoch_loss, num_batch = 0, 0
@@ -250,10 +254,10 @@ def run():
             wandb.log({'epoch_loss': epoch_loss})
 
         if (e + 1) % 10 == 0:
-            torch.save(gnn.state_dict(), 'pyg_{}.pt'.format(e + 1))
+            torch.save(gnn.state_dict(), 'pyg_{}_{}.pt'.format(exp_config.edge_type, e + 1))
 
             val_gnn = MPNN(gnn_config)
-            val_gnn.load_state_dict(torch.load('pyg_{}.pt'.format(e + 1)))
+            val_gnn.load_state_dict(torch.load('pyg_{}_{}.pt'.format(exp_config.edge_type, e + 1)))
             val_gnn.eval()
 
             val_loss, num_batch = 0, 0
