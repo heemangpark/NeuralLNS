@@ -21,7 +21,6 @@ from src.heuristic.regret import f_ijk
 from src.heuristic.shaw import removal
 from src.model.attention import MultiHeadCrossAttention
 from src.model.pyg_mpnn import MPNN
-from utils.prefetch_loader import PrefetchLoader
 from utils.scenario import load_scenarios
 from utils.seed import seed_everything
 from utils.solver import solver
@@ -224,12 +223,9 @@ def run(exp_type: str):
     val_data = torch.load('datas/pyg/8_8_20_5_5/val/{}.pt'.format(exp_config.edge_type))
     # test_data = torch.load('datas/pyg/8_8_20_5_5/test/{}.pt'.format(exp_config.edge_type))
 
-    train_loader = PrefetchLoader(loader=DataLoader(train_data, batch_size=exp_config.batch_size, shuffle=True),
-                                  device=exp_config.device)
-    val_loader = PrefetchLoader(loader=DataLoader(val_data, batch_size=exp_config.batch_size, shuffle=True),
-                                device=exp_config.device)
-    # test_loader = PrefetchLoader(loader=DataLoader(test_data, batch_size=exp_config.batch_size, shuffle=True),
-    #                              device=exp_config.device)
+    train_loader = DataLoader(train_data, batch_size=exp_config.batch_size, shuffle=True)
+    val_loader = DataLoader(val_data, batch_size=exp_config.batch_size, shuffle=True)
+    # test_loader = DataLoader(test_data, batch_size=exp_config.batch_size, shuffle=True)
 
     gnn_config = OmegaConf.load('config/model/mpnn.yaml')
     attn_config = OmegaConf.load('config/model/attention.yaml')
@@ -245,8 +241,8 @@ def run(exp_type: str):
     for e in trange(exp_config.epochs):
         epoch_loss, num_batch = 0, 0
 
-        for batch in train_loader:
-            batch_loss = gnn(batch)
+        for tr in train_loader:
+            batch_loss = gnn(tr.to(exp_config.device))
             epoch_loss += batch_loss
             num_batch += 1
         epoch_loss /= num_batch
@@ -262,8 +258,8 @@ def run(exp_type: str):
             val_gnn.eval()
 
             val_loss, num_batch = 0, 0
-            for batch in val_loader:
-                val_batch_loss = val_gnn(batch)
+            for val in val_loader:
+                val_batch_loss = val_gnn(val.to(exp_config.device))
                 val_loss += val_batch_loss
                 num_batch += 1
             val_loss /= num_batch
@@ -275,6 +271,7 @@ def run(exp_type: str):
 if __name__ == '__main__':
     # pyg_data(graph_type='homo')
     # pyg_data(graph_type='hetero')
+
     parser = argparse.ArgumentParser()
     parser.add_argument('--exp_type')
     args = parser.parse_args()
