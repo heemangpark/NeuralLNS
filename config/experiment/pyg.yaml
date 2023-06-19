@@ -2,5 +2,5 @@
 
 edge_type: P
 batch_size: 100
-device: cuda:0
 epochs: 100
+wandb: False

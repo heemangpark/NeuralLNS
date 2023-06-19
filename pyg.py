@@ -3,6 +3,7 @@ import os
 import random
 import shutil
 import sys
+from datetime import datetime
 
 import networkx as nx
 import numpy as np
@@ -19,7 +20,6 @@ from src.heuristic.regret import f_ijk
 from src.heuristic.shaw import removal
 from src.model.attention import MultiHeadCrossAttention
 from src.model.pyg_mpnn import MPNN
-from utils.prefetch_loader import PrefetchLoader
 from utils.scenario import load_scenarios
 from utils.seed import seed_everything
 from utils.solver import solver
@@ -94,7 +94,7 @@ def lns_itr_test(cfg):
         plt.clf()
 
 
-def pyg(graph_type: str):
+def pyg_data(graph_type: str):
     if graph_type == 'homo':
         for data_type in ['train', 'val', 'test']:
             data_list_A, data_list_M, data_list_P = [], [], []
@@ -214,29 +214,39 @@ def pyg(graph_type: str):
 
 
 def run():
+    date = datetime.now().strftime("%m%d_%H%M%S")
     seed_everything(seed=42)
 
     exp_config = OmegaConf.load('config/experiment/pyg.yaml')
     train_data = torch.load('datas/pyg/8_8_20_5_5/train/{}.pt'.format(exp_config.edge_type))
-    train_loader = PrefetchLoader(loader=DataLoader(train_data, batch_size=exp_config.batch_size, shuffle=True),
-                                  device=exp_config.device)
+    train_loader = DataLoader(train_data, batch_size=exp_config.batch_size, shuffle=True)
+
+    if exp_config.wandb:
+        import wandb
+        wandb.init(project='NeuralLNS', name=date, config=dict(params=OmegaConf.load('config/model/mpnn.yaml')))
 
     gnn_config = OmegaConf.load('config/model/mpnn.yaml')
     attn_config = OmegaConf.load('config/model/attention.yaml')
+
     gnn = MPNN(gnn_config)
     attn = MultiHeadCrossAttention(attn_config)
 
     for e in trange(exp_config.epochs):
-        for batch in train_loader:
-            hidden = gnn(batch)
-            hidden_a, hidden_t = hidden[:, :5, :], hidden[:, 5:, :]
+        epoch_loss = 0
 
-            output = hidden_a * hidden_t
-            # output = attn(a_emb, t_emb, t_emb)
-            print(output.shape)
+        for batch in train_loader:
+            batch_loss = gnn(batch)
+            epoch_loss += batch_loss
+
+        epoch_loss /= exp_config.batch_size
+        if exp_config.wandb:
+            wandb.log({'epoch_loss': epoch_loss})
+
+        if (e + 1) % 10 == 0:
+            torch.save(gnn.state_dict(), 'pyg_{}.pt'.format(e + 1))
 
 
 if __name__ == '__main__':
-    pyg(graph_type='homo')
-    pyg(graph_type='hetero')
-    # run()
+    # pyg_data(graph_type='homo')
+    # pyg_data(graph_type='hetero')
+    run()
