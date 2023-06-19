@@ -220,11 +220,11 @@ def run():
 
     train_data = torch.load('datas/pyg/8_8_20_5_5/train/{}.pt'.format(exp_config.edge_type))
     val_data = torch.load('datas/pyg/8_8_20_5_5/val/{}.pt'.format(exp_config.edge_type))
-    test_data = torch.load('datas/pyg/8_8_20_5_5/test/{}.pt'.format(exp_config.edge_type))
+    # test_data = torch.load('datas/pyg/8_8_20_5_5/test/{}.pt'.format(exp_config.edge_type))
 
     train_loader = DataLoader(train_data, batch_size=exp_config.batch_size, shuffle=True)
     val_loader = DataLoader(val_data, batch_size=exp_config.batch_size, shuffle=True)
-    test_loader = DataLoader(test_data, batch_size=exp_config.batch_size, shuffle=True)
+    # test_loader = DataLoader(test_data, batch_size=exp_config.batch_size, shuffle=True)
 
     if exp_config.wandb:
         import wandb
@@ -237,13 +237,14 @@ def run():
     attn = MultiHeadCrossAttention(attn_config)
 
     for e in trange(exp_config.epochs):
-        epoch_loss = 0
+        epoch_loss, num_batch = 0, 0
 
         for batch in train_loader:
             batch_loss = gnn(batch)
             epoch_loss += batch_loss
+            num_batch += 1
+        epoch_loss /= num_batch
 
-        epoch_loss /= exp_config.batch_size
         if exp_config.wandb:
             wandb.log({'epoch_loss': epoch_loss})
 
@@ -254,12 +255,13 @@ def run():
             val_gnn.load_state_dict(torch.load('pyg_{}.pt'.format(e + 1)))
             val_gnn.eval()
 
-            val_loss = 0
+            val_loss, num_batch = 0, 0
             for batch in val_loader:
                 val_batch_loss = val_gnn(batch)
                 val_loss += val_batch_loss
+                num_batch += 1
+            val_loss /= num_batch
 
-            val_loss /= exp_config.batch_size
             if exp_config.wandb:
                 wandb.log({'val_loss': val_loss})
 

@@ -2,6 +2,7 @@ import copy
 import os
 import shutil
 import subprocess
+from pathlib import Path
 
 import numpy as np
 
@@ -197,7 +198,7 @@ def one_step_solver(map, agents, tasks, save_dir, exp_name):
     save_map(map, exp_name, save_dir)
     one_to_one_scen(agents, tasks, exp_name, map.shape[0], map.shape[1], save_dir)
 
-    c = ['PBS/pbs',
+    c = [os.path.join(Path(os.path.realpath(__file__)).parent.parent, 'PBS/pbs'),
          "-m",
          save_dir + exp_name + '.map',
          "-a",
