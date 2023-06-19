@@ -29,7 +29,8 @@ class MPNN(nn.Module):
             nf = graph_conv(nf, e_id, ef)
 
         hidden = self.dec(nf).view(B, -1, 1)
-        hidden_a, hidden_t = hidden[:, :5, :], hidden[:, 5:, :]
+        median = hidden.shape[1] // 2  # assume single org single dst only
+        hidden_a, hidden_t = hidden[:, :median, :], hidden[:, median:, :]
 
         pred = hidden_a * hidden_t
         label = batch.y.view(B, -1, 1)
