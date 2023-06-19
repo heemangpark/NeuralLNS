@@ -1,4 +1,3 @@
-import argparse
 import copy
 import os
 import random
@@ -219,9 +218,12 @@ def run(exp_type: str):
     date = datetime.now().strftime("%m%d_%H%M%S")
     exp_config = OmegaConf.load('config/experiment/pyg_{}.yaml'.format(exp_type))
 
-    train_data = torch.load('datas/pyg/8_8_20_5_5/train/{}.pt'.format(exp_config.edge_type))
-    val_data = torch.load('datas/pyg/8_8_20_5_5/val/{}.pt'.format(exp_config.edge_type))
-    # test_data = torch.load('datas/pyg/8_8_20_5_5/test/{}.pt'.format(exp_config.edge_type))
+    train_data = torch.load('datas/pyg/8_8_20_5_5/train/{}.pt'.format(exp_config.edge_type),
+                            map_location=exp_config.device)
+    val_data = torch.load('datas/pyg/8_8_20_5_5/val/{}.pt'.format(exp_config.edge_type),
+                          map_location=exp_config.device)
+    # test_data = torch.load('datas/pyg/8_8_20_5_5/test/{}.pt'.format(exp_config.edge_type),
+    #                        map_location=exp_config.device)
 
     train_loader = DataLoader(train_data, batch_size=exp_config.batch_size, shuffle=True)
     val_loader = DataLoader(val_data, batch_size=exp_config.batch_size, shuffle=True)
@@ -251,10 +253,10 @@ def run(exp_type: str):
             wandb.log({'epoch_loss': epoch_loss})
 
         if (e + 1) % 10 == 0:
-            torch.save(gnn.state_dict(), 'pyg_{}_{}.pt'.format(exp_config.edge_type, e + 1))
+            torch.save(gnn.state_dict(), '{}_{}.pt'.format(exp_config.edge_type, e + 1))
 
-            val_gnn = MPNN(gnn_config)
-            val_gnn.load_state_dict(torch.load('pyg_{}_{}.pt'.format(exp_config.edge_type, e + 1)))
+            val_gnn = MPNN(gnn_config).to(exp_config.device)
+            val_gnn.load_state_dict(torch.load('{}_{}.pt'.format(exp_config.edge_type, e + 1)))
             val_gnn.eval()
 
             val_loss, num_batch = 0, 0
@@ -269,10 +271,31 @@ def run(exp_type: str):
 
 
 if __name__ == '__main__':
-    # pyg_data(graph_type='homo')
-    # pyg_data(graph_type='hetero')
+    import argparse
 
     parser = argparse.ArgumentParser()
-    parser.add_argument('--exp_type')
+    parser.add_argument('--exp_type', '-t')
     args = parser.parse_args()
     run(args.exp_type)
+
+    # A_data = torch.load('datas/pyg/8_8_20_5_5/val/A.pt')
+    # A_loader = DataLoader(A_data, batch_size=1000, shuffle=True)
+    # M_data = torch.load('datas/pyg/8_8_20_5_5/val/M.pt')
+    # M_loader = DataLoader(M_data, batch_size=1000, shuffle=True)
+    # P_data = torch.load('datas/pyg/8_8_20_5_5/val/P.pt')
+    # P_loader = DataLoader(P_data, batch_size=1000, shuffle=True)
+    #
+    # A_gnn = MPNN(OmegaConf.load('config/model/mpnn.yaml')).to('cuda:1')
+    # A_gnn.load_state_dict(torch.load('pyg_A_20.pt'))
+    # A_gnn.eval()
+    #
+    # M_gnn = MPNN(OmegaConf.load('config/model/mpnn.yaml')).to('cuda:2')
+    # M_gnn.load_state_dict(torch.load('pyg_M_20.pt'))
+    # M_gnn.eval()
+    #
+    # P_gnn = MPNN(OmegaConf.load('config/model/mpnn.yaml')).to('cuda:3')
+    # P_gnn.load_state_dict(torch.load('pyg_P_20.pt'))
+    # P_gnn.eval()
+    #
+    # for A, M, P in zip(A_loader, M_loader, P_loader):
+    #     A_loss, M_loss, P_loss = A_gnn(A.to('cuda:1')), M_gnn(M.to('cuda:2')), P_gnn(P.to('cuda:3'))
