@@ -217,7 +217,7 @@ def pyg_data(graph_type: str):
 def run():
     seed_everything(seed=42)
     date = datetime.now().strftime("%m%d_%H%M%S")
-    exp_config = OmegaConf.load('config/experiment/pyg.yaml')
+    exp_config = OmegaConf.load('config/experiment/pyg_A.yaml')
 
     train_data = torch.load('datas/pyg/8_8_20_5_5/train/{}.pt'.format(exp_config.edge_type))
     val_data = torch.load('datas/pyg/8_8_20_5_5/val/{}.pt'.format(exp_config.edge_type))
