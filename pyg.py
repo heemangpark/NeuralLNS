@@ -98,7 +98,7 @@ def pyg_data(graph_type: str):
     if graph_type == 'homo':
         for data_type in ['train', 'val', 'test']:
             data_list_A, data_list_M, data_list_P = [], [], []
-            scenarios = torch.load('datas/scenarios/8_8_20_5_5/{}.pt'.format(data_type))
+            scenarios = torch.load('datas/scenarios/16_16_20_5_20/{}.pt'.format(data_type))
 
             for scen in tqdm(scenarios):
                 grid, graph, a_coord, t_coord, y = scen
@@ -141,14 +141,14 @@ def pyg_data(graph_type: str):
                 data_P.to('cuda', non_blocking=True)
                 data_list_P.append(data_P)
 
-            torch.save(data_list_A, 'datas/pyg/8_8_20_5_5/{}/A.pt'.format(data_type))
-            torch.save(data_list_M, 'datas/pyg/8_8_20_5_5/{}/M.pt'.format(data_type))
-            torch.save(data_list_P, 'datas/pyg/8_8_20_5_5/{}/P.pt'.format(data_type))
+            torch.save(data_list_A, 'datas/pyg/16_16_20_5_20/{}/A.pt'.format(data_type))
+            torch.save(data_list_M, 'datas/pyg/16_16_20_5_20/{}/M.pt'.format(data_type))
+            torch.save(data_list_P, 'datas/pyg/16_16_20_5_20/{}/P.pt'.format(data_type))
 
     elif graph_type == 'hetero':
         for data_type in ['train', 'val', 'test']:
             data_list = []
-            scenarios = torch.load('datas/scenarios/8_8_20_5_5/{}.pt'.format(data_type))
+            scenarios = torch.load('datas/scenarios/16_16_20_5_20/{}.pt'.format(data_type))
 
             for scen in tqdm(scenarios):
                 grid, graph, a_coord, t_coord, y = scen
@@ -207,7 +207,7 @@ def pyg_data(graph_type: str):
 
                 data_list.append(data)
 
-            torch.save(data_list, 'datas/pyg/8_8_20_5_5/{}/hetero.pt'.format(data_type))
+            torch.save(data_list, 'datas/pyg/16_16_20_5_20/{}/hetero.pt'.format(data_type))
 
     else:
         raise ValueError('supports only homogeneous and heterogeneous graphs')
@@ -218,11 +218,11 @@ def run(exp_type: str):
     date = datetime.now().strftime("%m%d_%H%M%S")
     exp_config = OmegaConf.load('config/experiment/pyg_{}.yaml'.format(exp_type))
 
-    train_data = torch.load('datas/pyg/8_8_20_5_5/train/{}.pt'.format(exp_config.edge_type),
+    train_data = torch.load('datas/pyg/{}/train/{}.pt'.format(exp_config.exp, exp_config.edge_type),
                             map_location=exp_config.device)
-    val_data = torch.load('datas/pyg/8_8_20_5_5/val/{}.pt'.format(exp_config.edge_type),
+    val_data = torch.load('datas/pyg/{}/val/{}.pt'.format(exp_config.exp, exp_config.edge_type),
                           map_location=exp_config.device)
-    # test_data = torch.load('datas/pyg/8_8_20_5_5/test/{}.pt'.format(exp_config.edge_type),
+    # test_data = torch.load('datas/pyg/{}/test/{}.pt'.format(exp_config.exp, exp_config.edge_type),
     #                        map_location=exp_config.device)
 
     train_loader = DataLoader(train_data, batch_size=exp_config.batch_size, shuffle=True)
