@@ -22,7 +22,7 @@ from src.model.pyg_mpnn import MPNN
 from utils.prefetch_loader import PrefetchLoader
 from utils.scenario import load_scenarios
 from utils.seed import seed_everything
-from utils.solver import solver
+from utils.solver import solver, one_step_solver
 
 
 def lns_itr_test(cfg):
@@ -102,6 +102,7 @@ def pyg(graph_type: str):
 
             for scen in tqdm(scenarios):
                 grid, graph, a_coord, t_coord = scen
+                scen_cost = one_step_solver(grid, a_coord, t_coord, 'PBS/pyg/', '_')
 
                 x = torch.cat((torch.FloatTensor(a_coord), torch.FloatTensor(t_coord))) / grid.shape[0]
 
@@ -141,6 +142,7 @@ def pyg(graph_type: str):
 
             for scen in tqdm(scenarios):
                 grid, graph, a_coord, t_coord = scen
+                scen_cost = one_step_solver(grid, a_coord, t_coord, 'PBS/pyg/', '_')
 
                 src, dst = [], []
                 for a_id in range(len(a_coord)):
@@ -208,11 +210,11 @@ def run():
             hidden = gnn(batch)
             hidden_a, hidden_t = hidden[:, :5, :], hidden[:, 5:, :]
 
-            output = torch.bmm(hidden_a, hidden_t.transpose(1, -1))
+            output = hidden_a * hidden_t
             # output = attn(a_emb, t_emb, t_emb)
-
-            print(output)
+            print(output.shape)
 
 
 if __name__ == '__main__':
+    pyg(graph_type='homo')
     run()

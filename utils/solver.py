@@ -29,10 +29,21 @@ def save_scenario(agent_pos, total_tasks, scenario_name, row, column, save_dir):
     f = open(save_dir + '{}.scen'.format(scenario_name), 'w')
     f.write('version 1\n')
     for a, t in zip(agent_pos, total_tasks):
-        task = t[0]  # TODO:add task seq
+        task = t[0]
         dist = abs(np.array(a) - np.array(t)).sum()  # Manhattan dist
         line = '1 \t{} \t{} \t{} \t{} \t{} \t{} \t{} \t{}'.format('{}.map'.format(scenario_name), row, column, a[1],
                                                                   a[0], task[1], task[0], dist)
+        f.write(line + "\n")
+    f.close()
+
+
+def one_to_one_scen(a_coords, t_coords, scen_name, row, column, save_dir):
+    f = open(save_dir + '{}.scen'.format(scen_name), 'w')
+    f.write('version 1\n')
+    for a, t in zip(a_coords, t_coords):
+        dist = abs(np.array(a) - np.array(t)).sum()
+        line = '1 \t{} \t{} \t{} \t{} \t{} \t{} \t{} \t{}'.format('{}.map'.format(scen_name), row, column, a[1],
+                                                                  a[0], t[1], t[0], dist)
         f.write(line + "\n")
     f.close()
 
@@ -177,3 +188,34 @@ def id_to_assignment(assign_id, task_coords):
             id[a][idx] = {t_id: task_coords[t_id]}
 
     return id
+
+
+def one_step_solver(map, agents, tasks, save_dir, exp_name):
+    if not os.path.exists(save_dir):
+        os.makedirs(save_dir)
+
+    save_map(map, exp_name, save_dir)
+    one_to_one_scen(agents, tasks, exp_name, map.shape[0], map.shape[1], save_dir)
+
+    c = ['PBS/pbs',
+         "-m",
+         save_dir + exp_name + '.map',
+         "-a",
+         save_dir + exp_name + '.scen',
+         "-o",
+         save_dir + exp_name + ".csv",
+         "--outputPaths",
+         save_dir + exp_name + "paths.txt",
+         "-k", "{}".format(len(agents)),
+         "-t", "{}".format(1),
+         ]
+
+    process_out = subprocess.run(c, capture_output=True)
+    f = open(process_out.args[8], 'rb')
+    paths = str(f.read()).split('\\n')[:-1]
+    costs = [p.count('->') - 1 for p in paths]
+
+    if os.path.exists(save_dir):
+        shutil.rmtree(save_dir)
+
+    return costs
