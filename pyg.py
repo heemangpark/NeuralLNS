@@ -226,12 +226,13 @@ def run():
     val_loader = DataLoader(val_data, batch_size=exp_config.batch_size, shuffle=True)
     # test_loader = DataLoader(test_data, batch_size=exp_config.batch_size, shuffle=True)
 
-    if exp_config.wandb:
-        import wandb
-        wandb.init(project='NeuralLNS', name=date, config=dict(params=OmegaConf.load('config/model/mpnn.yaml')))
-
     gnn_config = OmegaConf.load('config/model/mpnn.yaml')
     attn_config = OmegaConf.load('config/model/attention.yaml')
+
+    if exp_config.wandb:
+        import wandb
+        wandb_config = dict(setup=exp_config, params=gnn_config)
+        wandb.init(project='NeuralLNS', name=date, config=wandb_config)
 
     gnn = MPNN(gnn_config)
     attn = MultiHeadCrossAttention(attn_config)
