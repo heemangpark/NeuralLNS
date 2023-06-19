@@ -4,5 +4,5 @@ batch_size: 100
 device: cuda:3
 edge_type: P
 epochs: 100
-exp: 16_16_20_10_10
+exp: "16_16_20_10_10"
 wandb: True
