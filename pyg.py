@@ -25,19 +25,20 @@ from utils.seed import seed_everything
 from utils.solver import solver
 
 
-def lns_itr_test(cfg):
-    seed_everything(cfg.seed)
+def lns_itr_test(config):
+    seed_everything(config.seed)
 
     for itrs in [100, 200, 300, 400, 500, 600, 700, 800, 900, 1000]:
         gap = []
 
-        for t in tqdm(list(random.sample(list(range(cfg.num_data)), k=100))):
+        for t in tqdm(list(random.sample(list(range(config.num_data)), k=100))):
             grid, grid_graph, a_coord, t_coord = load_scenarios(
-                '{}{}{}_{}_{}/scenario_{}.pkl'.format(cfg.map_size, cfg.map_size, cfg.obs_ratio,
-                                                      cfg.num_agent, cfg.num_task, t))
+                '{}{}{}_{}_{}/scenario_{}.pkl'.format(config.map_size, config.map_size, config.obs_ratio,
+                                                      config.num_agent, config.num_task, t))
             assign_idx, assign_coord = hungarian(a_coord, t_coord)
 
-            actual_init_cost, _ = solver(grid, a_coord, assign_coord, save_dir=cfg.save_dir, exp_name='init' + str(t))
+            actual_init_cost, _ = solver(grid, a_coord, assign_coord, save_dir=config.save_dir,
+                                         exp_name='init' + str(t))
             prev_cost = sum([sum(t) for t in [[abs(a[0] - b[0]) + abs(a[1] - b[1])
                                                for a, b, in zip(sch[:-1], sch[1:])] for sch in assign_coord]])
 
@@ -80,10 +81,11 @@ def lns_itr_test(cfg):
                     prev_cost = est_cost
                     assign_idx = copy.deepcopy(temp_assign_idx)
 
-            actual_final_cost, _ = solver(grid, a_coord, assign_coord, save_dir=cfg.save_dir, exp_name='fin' + str(t))
+            actual_final_cost, _ = solver(grid, a_coord, assign_coord, save_dir=config.save_dir,
+                                          exp_name='fin' + str(t))
 
-            if os.path.exists(cfg.save_dir):
-                shutil.rmtree(cfg.save_dir)
+            if os.path.exists(config.save_dir):
+                shutil.rmtree(config.save_dir)
 
             perf = (actual_init_cost - actual_final_cost) / actual_init_cost * 100
             gap.append(perf)
@@ -94,11 +96,12 @@ def lns_itr_test(cfg):
         plt.clf()
 
 
-def pyg_data(graph_type: str):
+def pyg_data(graph_type: str, scen_config: str):
     if graph_type == 'homo':
         for data_type in ['train', 'val', 'test']:
+
             data_list_A, data_list_M, data_list_P = [], [], []
-            scenarios = torch.load('datas/scenarios/16_16_20_5_20/{}.pt'.format(data_type))
+            scenarios = torch.load('datas/scenarios/{}/{}.pt'.format(scen_config, data_type))
 
             for scen in tqdm(scenarios):
                 grid, graph, a_coord, t_coord, y = scen
@@ -141,14 +144,15 @@ def pyg_data(graph_type: str):
                 data_P.to('cuda', non_blocking=True)
                 data_list_P.append(data_P)
 
-            torch.save(data_list_A, 'datas/pyg/16_16_20_5_20/{}/A.pt'.format(data_type))
-            torch.save(data_list_M, 'datas/pyg/16_16_20_5_20/{}/M.pt'.format(data_type))
-            torch.save(data_list_P, 'datas/pyg/16_16_20_5_20/{}/P.pt'.format(data_type))
+            torch.save(data_list_A, 'datas/pyg/{}/{}/A.pt'.format(scen_config, data_type))
+            torch.save(data_list_M, 'datas/pyg/{}/{}/M.pt'.format(scen_config, data_type))
+            torch.save(data_list_P, 'datas/pyg/{}/{}/P.pt'.format(scen_config, data_type))
 
     elif graph_type == 'hetero':
         for data_type in ['train', 'val', 'test']:
+
             data_list = []
-            scenarios = torch.load('datas/scenarios/16_16_20_5_20/{}.pt'.format(data_type))
+            scenarios = torch.load('datas/scenarios/{}/{}.pt'.format(scen_config, data_type))
 
             for scen in tqdm(scenarios):
                 grid, graph, a_coord, t_coord, y = scen
@@ -207,7 +211,7 @@ def pyg_data(graph_type: str):
 
                 data_list.append(data)
 
-            torch.save(data_list, 'datas/pyg/16_16_20_5_20/{}/hetero.pt'.format(data_type))
+            torch.save(data_list, 'datas/pyg/{}/{}/hetero.pt'.format(scen_config, data_type))
 
     else:
         raise ValueError('supports only homogeneous and heterogeneous graphs')
@@ -278,24 +282,4 @@ if __name__ == '__main__':
     args = parser.parse_args()
     run(args.exp_type)
 
-    # A_data = torch.load('datas/pyg/8_8_20_5_5/val/A.pt')
-    # A_loader = DataLoader(A_data, batch_size=1000, shuffle=True)
-    # M_data = torch.load('datas/pyg/8_8_20_5_5/val/M.pt')
-    # M_loader = DataLoader(M_data, batch_size=1000, shuffle=True)
-    # P_data = torch.load('datas/pyg/8_8_20_5_5/val/P.pt')
-    # P_loader = DataLoader(P_data, batch_size=1000, shuffle=True)
-    #
-    # A_gnn = MPNN(OmegaConf.load('config/model/mpnn.yaml')).to('cuda:1')
-    # A_gnn.load_state_dict(torch.load('pyg_A_20.pt'))
-    # A_gnn.eval()
-    #
-    # M_gnn = MPNN(OmegaConf.load('config/model/mpnn.yaml')).to('cuda:2')
-    # M_gnn.load_state_dict(torch.load('pyg_M_20.pt'))
-    # M_gnn.eval()
-    #
-    # P_gnn = MPNN(OmegaConf.load('config/model/mpnn.yaml')).to('cuda:3')
-    # P_gnn.load_state_dict(torch.load('pyg_P_20.pt'))
-    # P_gnn.eval()
-    #
-    # for A, M, P in zip(A_loader, M_loader, P_loader):
-    #     A_loss, M_loss, P_loss = A_gnn(A.to('cuda:1')), M_gnn(M.to('cuda:2')), P_gnn(P.to('cuda:3'))
+    # pyg_data(graph_type='homo', scen_config='16_16_20_5_20')
