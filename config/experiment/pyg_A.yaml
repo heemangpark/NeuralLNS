@@ -1,6 +1,6 @@
 # Feature comparison {A: astar, M: manhattan, P: proxy}
 
-batch_size: 1000
+batch_size: 100
 device: cuda:1
 edge_type: A
 epochs: 100

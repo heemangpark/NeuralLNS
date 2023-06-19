@@ -102,6 +102,7 @@ def pyg_data(graph_type: str, scen_config: str):
 
             data_list_A, data_list_M, data_list_P = [], [], []
             scenarios = torch.load('datas/scenarios/{}/{}.pt'.format(scen_config, data_type))
+            #  scen_config  8_8_20_5_5  16_16_20_5_20  32_32_5_50
 
             for scen in tqdm(scenarios):
                 grid, graph, a_coord, t_coord, y = scen
@@ -125,24 +126,18 @@ def pyg_data(graph_type: str, scen_config: str):
                         M.extend([man] * 2)
                         P.extend([proxy] * 2)
 
-                edge_attr_A = torch.FloatTensor(A).view(-1, 1)
-                edge_attr_M = torch.FloatTensor(M).view(-1, 1)
-                edge_attr_P = torch.FloatTensor(P).view(-1, 1)
-
-                data_A = Data(x=x, edge_index=edge_index, edge_attr=edge_attr_A, y=torch.Tensor(y))
-                data_A.pin_memory()
-                data_A.to('cuda', non_blocking=True)
-                data_list_A.append(data_A)
-
-                data_M = Data(x=x, edge_index=edge_index, edge_attr=edge_attr_M, y=torch.Tensor(y))
-                data_M.pin_memory()
-                data_M.to('cuda', non_blocking=True)
-                data_list_M.append(data_M)
-
-                data_P = Data(x=x, edge_index=edge_index, edge_attr=edge_attr_P, y=torch.Tensor(y))
-                data_P.pin_memory()
-                data_P.to('cuda', non_blocking=True)
-                data_list_P.append(data_P)
+                data_list_A.append(Data(x=x,
+                                        edge_index=edge_index,
+                                        edge_attr=torch.FloatTensor(A).view(-1, 1),
+                                        y=torch.Tensor(y)))
+                data_list_M.append(Data(x=x,
+                                        edge_index=edge_index,
+                                        edge_attr=torch.FloatTensor(M).view(-1, 1),
+                                        y=torch.Tensor(y)))
+                data_list_P.append(Data(x=x,
+                                        edge_index=edge_index,
+                                        edge_attr=torch.FloatTensor(P).view(-1, 1),
+                                        y=torch.Tensor(y)))
 
             torch.save(data_list_A, 'datas/pyg/{}/{}/A.pt'.format(scen_config, data_type))
             torch.save(data_list_M, 'datas/pyg/{}/{}/M.pt'.format(scen_config, data_type))
@@ -174,43 +169,35 @@ def pyg_data(graph_type: str, scen_config: str):
                         M.extend([man] * 2)
                         P.extend([proxy] * 2)
 
-                edge_attr_1 = torch.FloatTensor(A).view(-1, 1)
-                edge_attr_2 = torch.FloatTensor(M).view(-1, 1)
-                edge_attr_3 = torch.FloatTensor(P).view(-1, 1)
-
                 data = HeteroData()
                 data['agent'].x = torch.FloatTensor(a_coord) / grid.shape[0]
                 data['task'].x = torch.FloatTensor(t_coord) / grid.shape[0]
 
                 data['agent', 'astar', 'task'].edge_index = edge_index
-                data['agent', 'astar', 'task'].edge_attr = edge_attr_1
+                data['agent', 'astar', 'task'].edge_attr = torch.FloatTensor(A).view(-1, 1)
                 data['agent', 'astar', 'task'].y = torch.Tensor(y)
 
                 data['task', 'astar', 'agent'].edge_index = edge_index
-                data['task', 'astar', 'agent'].edge_attr = edge_attr_1
+                data['task', 'astar', 'agent'].edge_attr = torch.FloatTensor(A).view(-1, 1)
                 data['task', 'astar', 'agent'].y = torch.Tensor(y)
 
                 data['agent', 'man', 'task'].edge_index = edge_index
-                data['agent', 'man', 'task'].edge_attr = edge_attr_2
+                data['agent', 'man', 'task'].edge_attr = torch.FloatTensor(M).view(-1, 1)
                 data['agent', 'man', 'task'].y = torch.Tensor(y)
 
                 data['task', 'man', 'agent'].edge_index = edge_index
-                data['task', 'man', 'agent'].edge_attr = edge_attr_2
+                data['task', 'man', 'agent'].edge_attr = torch.FloatTensor(M).view(-1, 1)
                 data['task', 'man', 'agent'].y = torch.Tensor(y)
 
                 data['agent', 'proxy', 'task'].edge_index = edge_index
-                data['agent', 'proxy', 'task'].edge_attr = edge_attr_3
+                data['agent', 'proxy', 'task'].edge_attr = torch.FloatTensor(P).view(-1, 1)
                 data['agent', 'proxy', 'task'].y = torch.Tensor(y)
 
                 data['task', 'proxy', 'agent'].edge_index = edge_index
-                data['task', 'proxy', 'agent'].edge_attr = edge_attr_3
+                data['task', 'proxy', 'agent'].edge_attr = torch.FloatTensor(P).view(-1, 1)
                 data['task', 'proxy', 'agent'].y = torch.Tensor(y)
 
-                data.pin_memory()
-                data.to('cuda', non_blocking=True)
-
                 data_list.append(data)
-
             torch.save(data_list, 'datas/pyg/{}/{}/hetero.pt'.format(scen_config, data_type))
 
     else:
@@ -281,5 +268,3 @@ if __name__ == '__main__':
     parser.add_argument('--exp_type', '-t')
     args = parser.parse_args()
     run(args.exp_type)
-
-    # pyg_data(graph_type='homo', scen_config='16_16_20_5_20')
