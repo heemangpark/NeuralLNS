@@ -19,6 +19,7 @@ from src.heuristic.regret import f_ijk
 from src.heuristic.shaw import removal
 from src.model.attention import MultiHeadCrossAttention
 from src.model.pyg_mpnn import MPNN
+from utils.prefetch_loader import PrefetchLoader
 from utils.scenario import load_scenarios
 from utils.seed import seed_everything
 from utils.solver import solver
@@ -191,16 +192,18 @@ def pyg(graph_type: str):
 
 def run():
     seed_everything(seed=42)
-    train_data = torch.load('datas/pyg/8_8_20_5_5/train/P.pt')
-    train_loader = DataLoader(train_data, batch_size=100, shuffle=True)
+
+    exp_config = OmegaConf.load('config/experiment/pyg.yaml')
+    train_data = torch.load('datas/pyg/8_8_20_5_5/train/{}.pt'.format(exp_config.edge_type))
+    train_loader = PrefetchLoader(loader=DataLoader(train_data, batch_size=exp_config.batch_size, shuffle=True),
+                                  device=exp_config.device)
 
     gnn_config = OmegaConf.load('config/model/mpnn.yaml')
     attn_config = OmegaConf.load('config/model/attention.yaml')
     gnn = MPNN(gnn_config)
     attn = MultiHeadCrossAttention(attn_config)
 
-    # Training Loop
-    for e in trange(100):  # config/experiment/temp.yaml_epochs
+    for e in trange(exp_config.epochs):
         for batch in train_loader:
             hidden = gnn(batch)
             hidden_a, hidden_t = hidden[:, :5, :], hidden[:, 5:, :]
@@ -212,7 +215,4 @@ def run():
 
 
 if __name__ == '__main__':
-    # lns_itr_test(OmegaConf.load('config/lns_itr_test.yaml'))
-    # pyg(graph_type='homo')
-    # pyg(graph_type='hetero')
     run()
