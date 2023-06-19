@@ -4,7 +4,6 @@ import shutil
 import subprocess
 
 import numpy as np
-import torch
 
 
 def save_map(grid, filename, save_dir):
@@ -212,11 +211,14 @@ def one_step_solver(map, agents, tasks, save_dir, exp_name):
          ]
 
     process_out = subprocess.run(c, capture_output=True)
-    f = open(process_out.args[8], 'rb')
-    paths = str(f.read()).split('\\n')[:-1]
-    costs = [p.count('->') - 1 for p in paths]
+    if os.path.exists(process_out.args[8]):
+        f = open(process_out.args[8], 'rb')
+        paths = str(f.read()).split('\\n')[:-1]
+        costs = [p.count('->') - 1 for p in paths]
+    else:
+        costs = 'retry'
 
     if os.path.exists(save_dir):
         shutil.rmtree(save_dir)
 
-    return torch.Tensor(costs)
+    return costs
