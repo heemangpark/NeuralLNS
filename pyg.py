@@ -97,6 +97,7 @@ def lns_itr_test(config):
 
 
 def pyg_data(graph_type: str, scen_config: str):
+    seed_everything(seed=42)
     if graph_type == 'homo':
         for data_type in ['train', 'val', 'test']:
 
@@ -266,13 +267,13 @@ def run(exp_type: str):
 
 
 if __name__ == '__main__':
-    import argparse
+    # import argparse
+    #
+    # parser = argparse.ArgumentParser()
+    # parser.add_argument('--exp_type', '-t')
+    # args = parser.parse_args()
+    # run(args.exp_type)
 
-    parser = argparse.ArgumentParser()
-    parser.add_argument('--exp_type', '-t')
-    args = parser.parse_args()
-    run(args.exp_type)
-
-    # pyg_data(graph_type='homo', scen_config='8_8_20_5_5')
-    # pyg_data(graph_type='homo', scen_config='16_16_20_10_10')
-    # pyg_data(graph_type='homo', scen_config='32_32_20_10_10')
+    pyg_data(graph_type='homo', scen_config='8_8_20_5_5')
+    pyg_data(graph_type='homo', scen_config='16_16_20_10_10')
+    pyg_data(graph_type='homo', scen_config='32_32_20_10_10')
