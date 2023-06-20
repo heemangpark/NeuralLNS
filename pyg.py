@@ -273,7 +273,8 @@ if __name__ == '__main__':
     # parser.add_argument('--exp_type', '-t')
     # args = parser.parse_args()
     # run(args.exp_type)
+    run('A')
 
-    pyg_data(graph_type='homo', scen_config='8_8_20_5_5')
-    pyg_data(graph_type='homo', scen_config='16_16_20_10_10')
-    pyg_data(graph_type='homo', scen_config='32_32_20_10_10')
+    # pyg_data(graph_type='homo', scen_config='8_8_20_5_5')
+    # pyg_data(graph_type='homo', scen_config='16_16_20_10_10')
+    # pyg_data(graph_type='homo', scen_config='32_32_20_10_10')
