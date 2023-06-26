@@ -160,3 +160,19 @@ def sch_to_dgl(assign_idx, coord_schedule, size):
     graph.edata['dist'] = graph.edata['dist'].to(torch.float32)
 
     return graph
+
+
+def partition_8():
+    obs = [(0, 3), (1, 3), (2, 3),
+           (4, 0), (4, 1), (4, 2),
+           (5, 4), (6, 4), (7, 4),
+           (3, 5), (3, 6), (3, 7)]
+
+    grid = np.zeros((8, 8))
+    graph = nx.grid_2d_graph(8, 8)
+
+    for o in obs:
+        grid[o] = 1
+        graph.remove_node(o)
+
+    return grid, graph

@@ -4,4 +4,4 @@ batch_size: 1000
 device: cuda:3
 edge_type: P
 epochs: 100
-map: "8_8_20_5_5"
+map: "8_8_partition_5_5"

@@ -103,7 +103,7 @@ def pyg_data(graph_type: str, scen_config: str):
 
             data_list_A, data_list_M, data_list_P = [], [], []
             scenarios = torch.load('datas/scenarios/{}/{}.pt'.format(scen_config, data_type))
-            #  scen_config  8_8_20_5_5  16_16_20_10_10  32_32_20_10_10
+            #  scen_config  8_8_20_5_5  16_16_20_10_10  32_32_20_10_10  8_8_partition_5_5
 
             for scen in tqdm(scenarios):
                 grid, graph, a_coord, t_coord, y = scen
@@ -288,6 +288,7 @@ if __name__ == '__main__':
     # pyg_data(graph_type='homo', scen_config='8_8_20_5_5')
     # pyg_data(graph_type='homo', scen_config='16_16_20_10_10')
     # pyg_data(graph_type='homo', scen_config='32_32_20_10_10')
+    # pyg_data(graph_type='homo', scen_config='8_8_partition_5_5')
 
     # gnn_config = OmegaConf.load('config/model/mpnn.yaml')
     # exp_config = OmegaConf.load('config/experiment/pyg_P.yaml')
