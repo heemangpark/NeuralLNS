@@ -22,7 +22,7 @@ class MPNN(nn.Module):
         self.mlp = MLP([2 * config.model_dim, config.model_dim, config.model_dim, 1])
         self.mlp.reset_parameters()
 
-        self.loss = nn.L1Loss()
+        self.loss = getattr(nn, config.loss)()
         self.optimizer = Lion(self.parameters(), lr=config.optimizer.lr, weight_decay=config.optimizer.wd)
 
     def forward(self, batch: Batch):

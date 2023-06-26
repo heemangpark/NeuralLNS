@@ -4,5 +4,5 @@ batch_size: 1000
 device: cuda:3
 edge_type: P
 epochs: 100
-exp: "8_8_20_5_5"
-wandb: True
+loss: L1Loss
+map: "8_8_20_5_5"

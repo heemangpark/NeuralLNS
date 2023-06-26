@@ -205,10 +205,10 @@ def pyg_data(graph_type: str, scen_config: str):
         raise ValueError('supports only homogeneous and heterogeneous graphs')
 
 
-def run(exp_type: str):
+def run(exp_type: str, logging: bool):
     seed_everything(seed=42)
     date = datetime.now().strftime("%m%d_%H%M%S")
-    model_dir = 'datas/models/{}/'.format(date)
+    model_dir = 'datas/models/{}_{}'.format(date, exp_type)
     if not os.path.exists(model_dir):
         os.makedirs(model_dir)
 
@@ -228,10 +228,10 @@ def run(exp_type: str):
     gnn_config = OmegaConf.load('config/model/mpnn.yaml')
     attn_config = OmegaConf.load('config/model/attention.yaml')
 
-    if exp_config.wandb:
+    if logging:
         import wandb
         wandb_config = dict(exp_setup=exp_config, params=gnn_config)
-        wandb.init(project='NeuralLNS', name=date, config=wandb_config)
+        wandb.init(project='NeuralLNS', name=exp_type, config=wandb_config)
 
     gnn = MPNN(gnn_config).to(exp_config.device)
     attn = MultiHeadCrossAttention(attn_config).to(exp_config.device)
@@ -245,7 +245,7 @@ def run(exp_type: str):
             num_batch += 1
         epoch_loss /= num_batch
 
-        if exp_config.wandb:
+        if logging:
             wandb.log({'epoch_loss': epoch_loss})
 
         if (e + 1) % 10 == 0:
@@ -262,7 +262,7 @@ def run(exp_type: str):
                 num_batch += 1
             val_loss /= num_batch
 
-            if exp_config.wandb:
+            if logging:
                 wandb.log({'val_loss': val_loss})
 
 
@@ -271,10 +271,10 @@ if __name__ == '__main__':
 
     torch.multiprocessing.set_start_method('spawn')
     process = []
-    exp_type = ['A', 'M', 'P']
-    
-    for e_id in exp_type:
-        p = multiprocessing.Process(target=run, args=(e_id,))
+    edge_type = ['A', 'M', 'P']
+
+    for e_id in edge_type:
+        p = multiprocessing.Process(target=run, args=(e_id, True,))
         p.start()
         process.append(p)
 
