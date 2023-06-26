@@ -5,4 +5,4 @@ device: cuda:1
 edge_type: A
 epochs: 100
 exp: "8_8_20_5_5"
-wandb: False
+wandb: True
