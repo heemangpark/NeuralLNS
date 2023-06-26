@@ -269,8 +269,10 @@ def run(exp_type: str):
 if __name__ == '__main__':
     import multiprocessing
 
+    torch.multiprocessing.set_start_method('spawn')
     process = []
     exp_type = ['A', 'M', 'P']
+    
     for e_id in exp_type:
         p = multiprocessing.Process(target=run, args=(e_id,))
         p.start()
