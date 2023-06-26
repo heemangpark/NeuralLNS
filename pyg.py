@@ -214,11 +214,11 @@ def run(exp_type: str, logging: bool):
 
     exp_config = OmegaConf.load('config/experiment/pyg_{}.yaml'.format(exp_type))
 
-    train_data = torch.load('datas/pyg/{}/train/{}.pt'.format(exp_config.exp, exp_config.edge_type),
+    train_data = torch.load('datas/pyg/{}/train/{}.pt'.format(exp_config.map, exp_config.edge_type),
                             map_location=exp_config.device)
-    val_data = torch.load('datas/pyg/{}/val/{}.pt'.format(exp_config.exp, exp_config.edge_type),
+    val_data = torch.load('datas/pyg/{}/val/{}.pt'.format(exp_config.map, exp_config.edge_type),
                           map_location=exp_config.device)
-    # test_data = torch.load('datas/pyg/{}/test/{}.pt'.format(exp_config.exp, exp_config.edge_type),
+    # test_data = torch.load('datas/pyg/{}/test/{}.pt'.format(exp_config.map, exp_config.edge_type),
     #                        map_location=exp_config.device)
 
     train_loader = DataLoader(train_data, batch_size=exp_config.batch_size, shuffle=True)
@@ -288,7 +288,7 @@ if __name__ == '__main__':
     # gnn_config = OmegaConf.load('config/model/mpnn.yaml')
     # exp_config = OmegaConf.load('config/experiment/pyg_P.yaml')
     #
-    # val_data = torch.load('datas/pyg/{}/val/{}.pt'.format(exp_config.exp, exp_config.edge_type),
+    # val_data = torch.load('datas/pyg/{}/val/{}.pt'.format(exp_config.map, exp_config.edge_type),
     #                       map_location=exp_config.device)
     # val_loader = DataLoader(val_data, batch_size=exp_config.batch_size, shuffle=True)
     #
