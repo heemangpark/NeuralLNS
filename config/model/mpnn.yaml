@@ -7,6 +7,7 @@ num_layers: 5
 node_aggr: mean  # https://pytorch-geometric.readthedocs.io/en/latest/modules/nn.html#aggregation-operators
 act: ReLU
 residual: True
+loss: L1Loss
 
 optimizer:
   lr: 1e-4
