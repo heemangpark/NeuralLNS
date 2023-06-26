@@ -213,11 +213,11 @@ def run(exp_type: str, logging: bool):
     attn_config = OmegaConf.load('config/model/attention.yaml')
 
     date = datetime.now().strftime("%m%d_%H%M%S")
-    model_dir = 'datas/models/{}_{}'.format(date, exp_type)
+    model_dir = 'datas/models/{}_{}/'.format(date, exp_type)
     if not os.path.exists(model_dir):
         os.makedirs(model_dir)
 
-    with open(model_dir + '/config.txt', 'w') as file:
+    with open(model_dir + 'config.txt', 'w') as file:
         file.write('EXP SETUP: ' + str(exp_config) + '\n' +
                    'GNN SETUP: ' + str(gnn_config))
 
