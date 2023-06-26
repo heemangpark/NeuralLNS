@@ -207,12 +207,19 @@ def pyg_data(graph_type: str, scen_config: str):
 
 def run(exp_type: str, logging: bool):
     seed_everything(seed=42)
+
+    exp_config = OmegaConf.load('config/experiment/pyg_{}.yaml'.format(exp_type))
+    gnn_config = OmegaConf.load('config/model/mpnn.yaml')
+    attn_config = OmegaConf.load('config/model/attention.yaml')
+
     date = datetime.now().strftime("%m%d_%H%M%S")
     model_dir = 'datas/models/{}_{}'.format(date, exp_type)
     if not os.path.exists(model_dir):
         os.makedirs(model_dir)
 
-    exp_config = OmegaConf.load('config/experiment/pyg_{}.yaml'.format(exp_type))
+    with open(model_dir + '/config.txt', 'w') as file:
+        file.write('EXP SETUP: ' + str(exp_config) + '\n' +
+                   'GNN SETUP: ' + str(gnn_config))
 
     train_data = torch.load('datas/pyg/{}/train/{}.pt'.format(exp_config.map, exp_config.edge_type),
                             map_location=exp_config.device)
@@ -224,9 +231,6 @@ def run(exp_type: str, logging: bool):
     train_loader = DataLoader(train_data, batch_size=exp_config.batch_size, shuffle=True)
     val_loader = DataLoader(val_data, batch_size=exp_config.batch_size, shuffle=True)
     # test_loader = DataLoader(test_data, batch_size=exp_config.batch_size, shuffle=True)
-
-    gnn_config = OmegaConf.load('config/model/mpnn.yaml')
-    attn_config = OmegaConf.load('config/model/attention.yaml')
 
     if logging:
         import wandb
