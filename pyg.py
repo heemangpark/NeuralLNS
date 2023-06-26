@@ -267,13 +267,36 @@ def run(exp_type: str):
 
 
 if __name__ == '__main__':
-    import argparse
+    import multiprocessing
 
-    parser = argparse.ArgumentParser()
-    parser.add_argument('--exp_type', '-t')
-    args = parser.parse_args()
-    run(args.exp_type)
+    process = []
+    exp_type = ['A', 'M', 'P']
+    for e_id in exp_type:
+        p = multiprocessing.Process(target=run, args=(e_id,))
+        p.start()
+        process.append(p)
+
+    for p in process:
+        p.join()
 
     # pyg_data(graph_type='homo', scen_config='8_8_20_5_5')
     # pyg_data(graph_type='homo', scen_config='16_16_20_10_10')
     # pyg_data(graph_type='homo', scen_config='32_32_20_10_10')
+
+    # gnn_config = OmegaConf.load('config/model/mpnn.yaml')
+    # exp_config = OmegaConf.load('config/experiment/pyg_P.yaml')
+    #
+    # val_data = torch.load('datas/pyg/{}/val/{}.pt'.format(exp_config.exp, exp_config.edge_type),
+    #                       map_location=exp_config.device)
+    # val_loader = DataLoader(val_data, batch_size=exp_config.batch_size, shuffle=True)
+    #
+    # val_gnn = MPNN(gnn_config).to(exp_config.device)
+    # val_gnn.load_state_dict(torch.load('datas/models/0626_113229/P_100.pt'))
+    # val_gnn.eval()
+    #
+    # val_loss, num_batch = 0, 0
+    # for val in val_loader:
+    #     val_batch_loss = val_gnn(val.to(exp_config.device))
+    #     val_loss += val_batch_loss
+    #     num_batch += 1
+    # val_loss /= num_batch
