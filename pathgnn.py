@@ -3,16 +3,13 @@ import sys
 from datetime import datetime
 
 import networkx as nx
-import numpy as np
 import torch
 import torch_geometric as pyg
 from omegaconf import OmegaConf
-from torch_geometric.data import Data
 from torch_geometric.loader import DataLoader
 from tqdm import tqdm, trange
 
 sys.path.append(os.path.dirname(os.path.abspath(os.path.dirname(__file__))))
-from src.model.attention import MultiHeadCrossAttention
 from src.model.pyg_mpnn import MPNN
 from utils.seed import seed_everything
 
@@ -20,68 +17,37 @@ from utils.seed import seed_everything
 def generate_pathgnn_data():
     seed_everything(seed=42)
     for data_type in ['train', 'val', 'test']:
-
-        data_list_A, data_list_M, data_list_P = [], [], []
         scenarios = torch.load('datas/scenarios/8_8_20_5_5/{}.pt'.format(data_type))
 
         save_dir = 'datas/pyg/8_8_20_5_5/pathgnn/'
         if not os.path.exists(save_dir):
             os.makedirs(save_dir)
 
+        data_list = []
         for scen in tqdm(scenarios):
             grid, graph, a_coord, t_coord, y = scen
 
-            pyg_graph = pyg.utils.from_networkx(graph, group_node_attrs='', group_edge_attrs='')
-
             coords = torch.Tensor(list(graph.nodes())) / grid.shape[0]
+            types = torch.eye(3)[list(nx.get_node_attributes(graph, 'type').values())]
+
+            nf = torch.cat((coords, types), -1)
+            ef = torch.ones(graph.number_of_edges() * 2, 1)
+
+            pyg_graph = pyg.utils.from_networkx(graph)
+            pyg_graph.x, pyg_graph.edge_attr, pyg_graph.y = nf, ef, y
+            data_list.append(pyg_graph)
+
+        torch.save(data_list, save_dir + '{}.pt'.format(data_type))
 
 
-            x = torch.cat((coords, types), -1)
-
-            src, dst = [], []
-            for a_id in range(len(a_coord)):
-                for t_id in range(len(a_coord), len(a_coord) + len(t_coord)):
-                    src.extend([a_id, t_id])
-                    dst.extend([t_id, a_id])
-            edge_index = torch.LongTensor([src, dst])
-
-            A, M, P = [], [], []
-            for _a in a_coord:
-                for _t in t_coord:
-                    astar = nx.astar_path_length(graph, tuple(_a), tuple(_t)) / grid.shape[0]
-                    man = sum(abs(np.array(_a) - np.array(_t))) / grid.shape[0]
-                    proxy = astar - man
-                    A.extend([astar] * 2)
-                    M.extend([man] * 2)
-                    P.extend([proxy] * 2)
-
-            data_list_A.append(Data(x=x,
-                                    edge_index=edge_index,
-                                    edge_attr=torch.FloatTensor(A).view(-1, 1),
-                                    y=torch.Tensor(y)))
-            data_list_M.append(Data(x=x,
-                                    edge_index=edge_index,
-                                    edge_attr=torch.FloatTensor(M).view(-1, 1),
-                                    y=torch.Tensor(y)))
-            data_list_P.append(Data(x=x,
-                                    edge_index=edge_index,
-                                    edge_attr=torch.FloatTensor(P).view(-1, 1),
-                                    y=torch.Tensor(y)))
-
-        torch.save(data_list_A, save_dir + 'A.pt')
-        torch.save(data_list_M, save_dir + 'M.pt')
-        torch.save(data_list_P, save_dir + 'P.pt')
-
-
-def run(exp_type: str, logging: bool):
+def run(logging: bool):
     seed_everything(seed=42)
 
-    exp_config = OmegaConf.load('config/experiment/pyg_{}.yaml'.format(exp_type))
+    exp_config = OmegaConf.load('config/experiment/pathgnn.yaml')
     gnn_config = OmegaConf.load('config/model/mpnn.yaml')
-    attn_config = OmegaConf.load('config/model/attention.yaml')
 
     date = datetime.now().strftime("%m%d_%H%M%S")
-    model_dir = 'datas/models/{}_{}/'.format(date, exp_type)
+    model_dir = 'datas/models/{}_pathgnn/'.format(date)
     if not os.path.exists(model_dir):
         os.makedirs(model_dir)
 
@@ -89,30 +55,24 @@ def run(exp_type: str, logging: bool):
         file.write('EXP SETUP: ' + str(exp_config) + '\n' +
                    'GNN SETUP: ' + str(gnn_config))
 
-    train_data = torch.load('datas/pyg/{}/train/{}.pt'.format(exp_config.map, exp_config.edge_type),
-                            map_location=exp_config.device)
-    val_data = torch.load('datas/pyg/{}/val/{}.pt'.format(exp_config.map, exp_config.edge_type),
-                          map_location=exp_config.device)
-    # test_data = torch.load('datas/pyg/{}/test/{}.pt'.format(exp_config.map, exp_config.edge_type),
-    #                        map_location=exp_config.device)
-
+    train_data = torch.load('datas/pyg/{}/pathgnn/train.pt'.format(exp_config.map), map_location=exp_config.device)
     train_loader = DataLoader(train_data, batch_size=exp_config.batch_size, shuffle=True)
+
+    val_data = torch.load('datas/pyg/{}/pathgnn/val.pt'.format(exp_config.map), map_location=exp_config.device)
     val_loader = DataLoader(val_data, batch_size=exp_config.batch_size, shuffle=True)
-    # test_loader = DataLoader(test_data, batch_size=exp_config.batch_size, shuffle=True)
 
     if logging:
         import wandb
         wandb_config = dict(exp_setup=exp_config, params=gnn_config)
-        wandb.init(project='NeuralLNS', name=exp_type, config=wandb_config)
+        wandb.init(project='FW', name=date, config=wandb_config)
 
     gnn = MPNN(gnn_config).to(exp_config.device)
-    attn = MultiHeadCrossAttention(attn_config).to(exp_config.device)
 
-    for e in trange(exp_config.epochs):
+    for e in trange(100):
         epoch_loss, num_batch = 0, 0
 
         for tr in train_loader:
-            batch_loss = gnn(tr.to(exp_config.device))
+            batch_loss = gnn(tr)
             epoch_loss += batch_loss
             num_batch += 1
         epoch_loss /= num_batch
@@ -139,18 +99,5 @@ def run(exp_type: str, logging: bool):
 
 
 if __name__ == '__main__':
-    # import multiprocessing
-    #
-    # torch.multiprocessing.set_start_method('spawn')
-    # process = []
-    # edge_type = ['A', 'M', 'P']
-    #
-    # for e_id in edge_type:
-    #     p = multiprocessing.Process(target=run, args=(e_id, True,))
-    #     p.start()
-    #     process.append(p)
-    #
-    # for p in process:
-    #     p.join()
-
     generate_pathgnn_data()
+    run(logging=False)

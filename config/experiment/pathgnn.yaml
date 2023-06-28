@@ -1,0 +1,3 @@
+batch_size: 10
+device: 'cuda:0'
+map: "8_8_20_5_5"
