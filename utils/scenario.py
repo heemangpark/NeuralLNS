@@ -4,6 +4,7 @@ import random
 import sys
 from pathlib import Path
 
+import networkx as nx
 import numpy as np
 import torch
 from tqdm import trange
@@ -17,7 +18,7 @@ curr_path = os.path.realpath(__file__)
 home_dir = Path(curr_path).parent.parent
 
 
-def save_random_scenarios(itrs: int, size: int, obs: int, a: int, t: int, seed: int):
+def save_random_scenarios(itrs: int, size: int, obs: int, a: int, t: int, seed: int, include_type: bool):
     seed_everything(seed)
 
     data_list = []
@@ -42,6 +43,18 @@ def save_random_scenarios(itrs: int, size: int, obs: int, a: int, t: int, seed: 
             a_coord = np.array(graph.nodes())[a_idx].tolist()
             t_coord = np.array(graph.nodes())[t_idx].tolist()
 
+            if include_type:
+                EMPTY, AGENT, TASK = 0, 1, 2
+                types = []
+                for n in graph.nodes():
+                    if list(n) in a_coord:
+                        types.append(AGENT)
+                    elif list(n) in t_coord:
+                        types.append(TASK)
+                    else:
+                        types.append(EMPTY)
+                nx.set_node_attributes(graph, dict(zip(graph.nodes(), types)), 'type')
+
             cost = one_step_solver(grid, a_coord, t_coord, os.path.join(home_dir, 'PBS/pyg/'), '_')
             if cost == 'retry':
                 itrs += 1
@@ -56,7 +69,7 @@ def save_random_scenarios(itrs: int, size: int, obs: int, a: int, t: int, seed: 
     torch.save(data_list[num_train + num_val: num_train + num_val + num_test], data_dir + 'test.pt')
 
 
-def save_partition_scenarios(itrs: int, size: int, a: int, t: int, seed: int):
+def save_partition_scenarios(itrs: int, size: int, a: int, t: int, seed: int, include_type: bool):
     seed_everything(seed)
 
     data_list = []
@@ -81,6 +94,18 @@ def save_partition_scenarios(itrs: int, size: int, a: int, t: int, seed: int):
             a_coord = np.array(graph.nodes())[a_idx].tolist()
             t_coord = np.array(graph.nodes())[t_idx].tolist()
 
+            if include_type:
+                EMPTY, AGENT, TASK = 0, 1, 2
+                types = []
+                for n in graph.nodes():
+                    if list(n) in a_coord:
+                        types.append(AGENT)
+                    elif list(n) in t_coord:
+                        types.append(TASK)
+                    else:
+                        types.append(EMPTY)
+                nx.set_node_attributes(graph, dict(zip(graph.nodes(), types)), 'type')
+
             cost = one_step_solver(grid, a_coord, t_coord, os.path.join(home_dir, 'PBS/pyg/'), '_')
             if cost == 'retry':
                 itrs += 1
@@ -103,5 +128,5 @@ def load_scenarios(dir):
 
 
 if __name__ == "__main__":
-    save_random_scenarios(itrs=100000, size=8, obs=20, a=5, t=5, seed=42)
-    save_partition_scenarios(itrs=100000, size=8, a=5, t=5, seed=42)
+    save_random_scenarios(itrs=100000, size=8, obs=20, a=5, t=5, seed=42, include_type=True)
+    save_partition_scenarios(itrs=100000, size=8, a=5, t=5, seed=42, include_type=True)

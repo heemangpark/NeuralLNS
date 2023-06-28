@@ -68,7 +68,7 @@ import torch
 #     return g
 
 
-def valid_graph(size=32, obs=20, rand_coord=False):
+def valid_graph(size: int, obs: int, rand_coord=False):
     instance = np.zeros((size, size))
     obstacle = np.random.random((size, size)) <= obs / 100
     instance[obstacle] = 1
