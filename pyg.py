@@ -105,6 +105,10 @@ def pyg_data(graph_type: str, scen_config: str):
             scenarios = torch.load('datas/scenarios/{}/{}.pt'.format(scen_config, data_type))
             #  scen_config  8_8_20_5_5  16_16_20_10_10  32_32_20_10_10  8_8_partition_5_5
 
+            save_dir = 'datas/pyg/{}/{}/'.format(scen_config, data_type)
+            if not os.path.exists(save_dir):
+                os.makedirs(save_dir)
+
             for scen in tqdm(scenarios):
                 grid, graph, a_coord, t_coord, y = scen
 
@@ -140,9 +144,9 @@ def pyg_data(graph_type: str, scen_config: str):
                                         edge_attr=torch.FloatTensor(P).view(-1, 1),
                                         y=torch.Tensor(y)))
 
-            torch.save(data_list_A, 'datas/pyg/{}/{}/A.pt'.format(scen_config, data_type))
-            torch.save(data_list_M, 'datas/pyg/{}/{}/M.pt'.format(scen_config, data_type))
-            torch.save(data_list_P, 'datas/pyg/{}/{}/P.pt'.format(scen_config, data_type))
+            torch.save(data_list_A, save_dir + 'A.pt')
+            torch.save(data_list_M, save_dir + 'M.pt')
+            torch.save(data_list_P, save_dir + 'P.pt')
 
     elif graph_type == 'hetero':
         for data_type in ['train', 'val', 'test']:
