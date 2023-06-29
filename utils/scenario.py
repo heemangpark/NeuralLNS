@@ -33,7 +33,7 @@ def save_random_scenarios(itrs: int, size: int, obs: int, a: int, t: int, seed: 
 
     for _ in trange(itrs):
         while True:
-            grid, graph = valid_graph(size, obs)
+            grid, graph = valid_graph(size=size, obs=obs, fixed=False)
 
             grid_idx = list(range(len(graph)))
             a_idx = random.sample(grid_idx, a)
@@ -128,5 +128,5 @@ def load_scenarios(dir):
 
 
 if __name__ == "__main__":
-    save_random_scenarios(itrs=100000, size=8, obs=20, a=5, t=5, seed=42, include_type=True)
-    # save_partition_scenarios(itrs=100000, size=8, a=5, t=5, seed=42, include_type=True)
+    save_random_scenarios(itrs=100000, size=8, obs=20, a=5, t=5, seed=42, include_type=False)
+    save_partition_scenarios(itrs=100000, size=8, a=5, t=5, seed=42, include_type=False)
