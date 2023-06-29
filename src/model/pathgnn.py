@@ -3,6 +3,7 @@ from math import sqrt
 import torch
 import torch.nn as nn
 from einops import repeat, rearrange
+from lion_pytorch import Lion
 from torch_geometric.data import Batch
 from torch_geometric.nn import MessagePassing
 
@@ -173,7 +174,14 @@ class PathGNN(nn.Module):
 
         self.dec = nn.Linear(model_config.model_dim, model_config.e_enc_dim)
 
+        self.loss = getattr(nn, model_config.loss)()
+        self.optimizer = Lion(self.parameters(), lr=model_config.optimizer.lr, weight_decay=model_config.optimizer.wd)
+
+        self.to(config.device)
+
     def forward(self, batch: Batch) -> torch.Tensor:
+        device = batch.batch.device
+
         nf, ef = self.init_emb(batch)
         n = nf.shape[0] // batch.num_graphs
         pf = self.path_init(batch.batch, batch.num_graphs, n, batch.edge_index, ef)
@@ -181,5 +189,14 @@ class PathGNN(nn.Module):
         for path_conv in self.path_convs:
             nf, pf = path_conv(nf, pf, batch.edge_index)
 
-        pred = self.dec(pf)
-        return pred
+        pred = self.dec(pf).squeeze(-1)
+        y_hat = torch.cat([torch.diagonal(p)[-5:] for p in pred]).view(-1)
+        label = torch.Tensor(batch.y).view(-1).to(device)
+
+        loss = self.loss(y_hat, label)
+        loss.backward()
+
+        self.optimizer.step()
+        self.optimizer.zero_grad()
+
+        return loss.item()

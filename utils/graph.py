@@ -80,17 +80,23 @@ def valid_graph(size: int, obs: int, fixed: bool):
         obstacle = np.random.random((size, size)) <= obs / 100
         instance[obstacle] = 1
 
-    g = generate_2d_graph(instance)
-    components = [c for c in nx.connected_components(g)]
+    graph = generate_2d_graph(instance)
+    components = [c for c in nx.connected_components(graph)]
 
     while len(components) != 1:
-        instance = np.zeros((size, size))
-        obstacle = np.random.random((size, size)) <= obs / 100
-        instance[obstacle] = 1
-        g = generate_2d_graph(instance)
-        components = [c for c in nx.connected_components(g)]
+        if fixed:
+            temp = np.array([False for _ in range(50)] + [True for _ in range(14)])
+            random.shuffle(temp)
+            temp = temp.reshape(size, size)
+            instance = np.ones((size, size)) * temp
+        else:
+            instance = np.zeros((size, size))
+            obstacle = np.random.random((size, size)) <= obs / 100
+            instance[obstacle] = 1
+        graph = generate_2d_graph(instance)
+        components = [c for c in nx.connected_components(graph)]
 
-    return instance, g
+    return instance, graph
 
 
 def generate_2d_graph(instance):

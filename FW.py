@@ -2,7 +2,6 @@ import os
 import sys
 from datetime import datetime
 
-import networkx as nx
 import torch
 import torch_geometric as pyg
 from omegaconf import OmegaConf
@@ -18,9 +17,9 @@ from utils.seed import seed_everything
 def generate_pathgnn_data():
     seed_everything(seed=42)
     for data_type in ['train', 'val', 'test']:
-        scenarios = torch.load('datas/scenarios/8_8_20_5_5/{}.pt'.format(data_type))
+        scenarios = torch.load('datas/scenarios/pathgnn/{}.pt'.format(data_type))
 
-        save_dir = 'datas/pyg/8_8_20_5_5/pathgnn/'
+        save_dir = 'datas/pyg/pathgnn/'
         if not os.path.exists(save_dir):
             os.makedirs(save_dir)
 
@@ -28,16 +27,12 @@ def generate_pathgnn_data():
         for scen in tqdm(scenarios):
             grid, graph, a_coord, t_coord, y = scen
 
-            coords = torch.Tensor(list(graph.nodes())) / grid.shape[0]
+            empty_coord = list(list(filter(lambda x: list(x) not in a_coord + t_coord, list(graph.nodes()))))
+            coords = torch.Tensor(empty_coord + a_coord + t_coord) / grid.shape[0]
 
-            one_hot = []  # EMPTY, AGENT, TASK one-hot
-            for t in nx.get_node_attributes(graph, 'type').values():
-                if t in range(5):
-                    one_hot.append(1)
-                elif t in range(5, 10):
-                    one_hot.append(2)
-                else:
-                    one_hot.append(0)
+            one_hot = [0 for _ in range(len(empty_coord))] + \
+                      [1 for _ in range(len(a_coord))] + \
+                      [2 for _ in range(len(t_coord))]
             types = torch.eye(3)[one_hot]
 
             nf = torch.cat((coords, types), -1)
@@ -62,10 +57,10 @@ def run(logging: bool):
     with open(model_dir + 'config.txt', 'w') as file:
         file.write('EXP SETUP: ' + str(config))
 
-    train_data = torch.load('datas/pyg/{}/pathgnn/train.pt'.format(config.map), map_location=config.device)
+    train_data = torch.load('datas/pyg/pathgnn/train.pt', map_location=config.device)
     train_loader = DataLoader(train_data, batch_size=config.batch_size, shuffle=True)
 
-    val_data = torch.load('datas/pyg/{}/pathgnn/val.pt'.format(config.map), map_location=config.device)
+    val_data = torch.load('datas/pyg/pathgnn/val.pt', map_location=config.device)
     val_loader = DataLoader(val_data, batch_size=config.batch_size, shuffle=True)
 
     if logging:
@@ -115,4 +110,5 @@ def run(logging: bool):
 
 
 if __name__ == '__main__':
-    run(logging=False)
+    # generate_pathgnn_data()
+    run(logging=True)
