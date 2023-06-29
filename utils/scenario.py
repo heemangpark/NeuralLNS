@@ -44,15 +44,15 @@ def save_random_scenarios(itrs: int, size: int, obs: int, a: int, t: int, seed: 
             t_coord = np.array(graph.nodes())[t_idx].tolist()
 
             if include_type:
-                EMPTY, AGENT, TASK = 0, 1, 2
                 types = []
                 for n in graph.nodes():
                     if list(n) in a_coord:
-                        types.append(AGENT)
+                        types.append(a_coord.index(list(n)))  # range(0, a)
                     elif list(n) in t_coord:
-                        types.append(TASK)
+                        types.append(len(t_coord) + t_coord.index(list(n)))  # range(a, a + t)
                     else:
-                        types.append(EMPTY)
+                        types.append(-1)
+
                 nx.set_node_attributes(graph, dict(zip(graph.nodes(), types)), 'type')
 
             cost = one_step_solver(grid, a_coord, t_coord, os.path.join(home_dir, 'PBS/pyg/'), '_')
@@ -95,15 +95,15 @@ def save_partition_scenarios(itrs: int, size: int, a: int, t: int, seed: int, in
             t_coord = np.array(graph.nodes())[t_idx].tolist()
 
             if include_type:
-                EMPTY, AGENT, TASK = 0, 1, 2
                 types = []
                 for n in graph.nodes():
                     if list(n) in a_coord:
-                        types.append(AGENT)
+                        types.append(a_coord.index(list(n)))  # range(0, a)
                     elif list(n) in t_coord:
-                        types.append(TASK)
+                        types.append(len(t_coord) + t_coord.index(list(n)))  # range(a, a + t)
                     else:
-                        types.append(EMPTY)
+                        types.append(-1)
+
                 nx.set_node_attributes(graph, dict(zip(graph.nodes(), types)), 'type')
 
             cost = one_step_solver(grid, a_coord, t_coord, os.path.join(home_dir, 'PBS/pyg/'), '_')
@@ -129,4 +129,4 @@ def load_scenarios(dir):
 
 if __name__ == "__main__":
     save_random_scenarios(itrs=100000, size=8, obs=20, a=5, t=5, seed=42, include_type=True)
-    save_partition_scenarios(itrs=100000, size=8, a=5, t=5, seed=42, include_type=True)
+    # save_partition_scenarios(itrs=100000, size=8, a=5, t=5, seed=42, include_type=True)
