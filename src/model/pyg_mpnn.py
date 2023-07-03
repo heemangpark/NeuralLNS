@@ -30,9 +30,9 @@ class MPNN(nn.Module):
 
     def forward(self, batch: Batch, type: None):
         nf, e_id = batch.x, batch.edge_index
-        if type is 'A':
+        if type == 'A':
             ef = torch.cat((batch.edge_attr[:, 0].view(-1, 1), batch.edge_attr[:, 2].view(-1, 1)), dim=-1)
-        elif type is 'M':
+        elif type == 'M':
             ef = torch.cat((batch.edge_attr[:, 1].view(-1, 1), batch.edge_attr[:, 2].view(-1, 1)), dim=-1)
         else:
             ef = batch.edge_attr
