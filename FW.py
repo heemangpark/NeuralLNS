@@ -86,15 +86,15 @@ def run(logging: bool):
                        'pathgnn_train_loss': pathgnn_epoch_loss})
 
         if (e + 1) % 10 == 0:
-            torch.save(mpnn.state_dict(), model_dir + 'mpnn.pt')
-            torch.save(pathgnn.state_dict(), model_dir + 'pathgnn.pt')
+            torch.save(mpnn.state_dict(), model_dir + 'mpnn_{}.pt'.format(e + 1))
+            torch.save(pathgnn.state_dict(), model_dir + 'pathgnn.pt'.format(e + 1))
 
             val_mpnn, val_pathgnn = MPNN(config), PathGNN(config)
-            val_mpnn.load_state_dict(torch.load(model_dir + 'mpnn.pt'))
-            val_pathgnn.load_state_dict(torch.load(model_dir + 'pathgnn.pt'))
+            val_mpnn.load_state_dict(torch.load(model_dir + 'mpnn.pt'.format(e + 1)))
+            val_pathgnn.load_state_dict(torch.load(model_dir + 'pathgnn.pt'.format(e + 1)))
             val_mpnn.eval(), val_pathgnn.eval()
 
-            val_mpnn_loss, val_pathgnn_loss, num_batch = 0, 0
+            val_mpnn_loss, val_pathgnn_loss, num_batch = 0, 0, 0
             for val in val_loader:
                 val_mpnn_batch_loss = val_mpnn(val)
                 val_pathgnn_batch_loss = val_pathgnn(val)

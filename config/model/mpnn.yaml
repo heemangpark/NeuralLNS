@@ -1,7 +1,7 @@
 # Torch Geometric MPNN Configuration
 
 n_enc_dim: 5
-e_enc_dim: 1
+e_enc_dim: 3
 model_dim: 64
 num_layers: 3
 node_aggr: mean  # https://pytorch-geometric.readthedocs.io/en/latest/modules/nn.html#aggregation-operators

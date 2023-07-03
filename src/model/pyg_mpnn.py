@@ -28,10 +28,15 @@ class MPNN(nn.Module):
 
         self.to(config.device)
 
-    def forward(self, batch: Batch):
-        device = batch.batch.device
+    def forward(self, batch: Batch, type: None):
+        nf, e_id = batch.x, batch.edge_index
+        if type is 'A':
+            ef = torch.cat((batch.edge_attr[:, 0].view(-1, 1), batch.edge_attr[:, 2].view(-1, 1)), dim=-1)
+        elif type is 'M':
+            ef = torch.cat((batch.edge_attr[:, 1].view(-1, 1), batch.edge_attr[:, 2].view(-1, 1)), dim=-1)
+        else:
+            ef = batch.edge_attr
 
-        nf, e_id, ef = batch.x, batch.edge_index, batch.edge_attr
         nf, ef = self.node_enc(nf), self.edge_enc(ef)
 
         for graph_conv in self.graph_convs:
@@ -42,7 +47,7 @@ class MPNN(nn.Module):
         nf = rearrange(torch.cat((agent_nf, task_nf), -1), 'N C L -> (N C) L')
 
         y_hat = self.mlp(nf)
-        label = torch.Tensor(batch.y).view(-1, 1).to(device)
+        label = batch.y.view(-1, 1)
 
         # num_nodes = batch.ptr.cpu().numpy()
         # total_types = []
