@@ -102,7 +102,7 @@ def run(device: str, gnn_type: str, logging: bool):
             val_loss, num_batch = 0, 0
             for val in val_loader:
                 loss_per_batch = val_gnn(val)
-                val_gnn += loss_per_batch
+                val_loss += loss_per_batch
                 num_batch += 1
             val_loss /= num_batch
 
@@ -115,7 +115,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('-d', '--device')
     parser.add_argument('-g', '--gnn_type')
-    parser.add_argument('-l', '--logging', action=argparse.BooleanOptionalAction, default=True)
+    parser.add_argument('-l', '--logging', action=argparse.BooleanOptionalAction)
     args = parser.parse_args()
     run(device=args.device, gnn_type=args.gnn_type, logging=args.logging)
 
