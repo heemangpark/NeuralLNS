@@ -49,73 +49,82 @@ def generate_pathgnn_data():
         torch.save(data_list, save_dir + '{}.pt'.format(data_type))
 
 
-def run(logging: bool):
+def run(device: str, gnn_type: str, logging: bool):
     seed_everything(seed=42)
-    config = OmegaConf.load('config/experiment/pathgnn.yaml')
+    config = OmegaConf.load('config/experiment/FW.yaml')
 
     date = datetime.now().strftime("%m%d_%H%M%S")
     model_dir = 'datas/models/{}_pathgnn/'.format(date)
     if not os.path.exists(model_dir):
         os.makedirs(model_dir)
 
-    train_data = torch.load('datas/pyg/pathgnn/train.pt', map_location=config.device)
+    train_data = torch.load('datas/pyg/pathgnn/train.pt', map_location=device)
     train_loader = DataLoader(train_data, batch_size=config.batch_size, shuffle=True)
 
-    val_data = torch.load('datas/pyg/pathgnn/val.pt', map_location=config.device)
+    val_data = torch.load('datas/pyg/pathgnn/val.pt', map_location=device)
     val_loader = DataLoader(val_data, batch_size=config.batch_size, shuffle=True)
 
     if logging:
         import wandb
-        wandb.init(project='FW', name=date, config=dict(setup=config))
+        wandb.init(project='FW', name=gnn_type, config=dict(setup=config))
 
-    mpnn = PathMPNN(config)
-    pathgnn = PathGNN(config)
+    if gnn_type == 'mpnn':
+        gnn = PathMPNN(config).to(device)
+    elif gnn_type == 'pathgnn':
+        gnn = PathGNN(config).to(device)
+    else:
+        raise NotImplementedError('{} is an unsupported model'.format(gnn_type))
 
     for e in trange(100):
-        mpnn_train_loss, pathgnn_train_loss, num_batch = 0, 0, 0
+        train_loss, num_batch = 0, 0
 
         for tr in train_loader:
-            mpnn_batch_loss = mpnn(tr)
-            mpnn_train_loss += mpnn_batch_loss
-
-            pathgnn_batch_loss = pathgnn(tr)
-            pathgnn_train_loss += pathgnn_batch_loss
-
+            loss_per_batch = gnn(tr)
+            train_loss += loss_per_batch
             num_batch += 1
-
-        mpnn_train_loss /= num_batch
-        pathgnn_train_loss /= num_batch
+        train_loss /= num_batch
 
         if logging:
-            wandb.log({'mpnn_train_loss': mpnn_train_loss,
-                       'pathgnn_train_loss': pathgnn_train_loss})
+            wandb.log({'train_loss': train_loss})
 
         if (e + 1) % 10 == 0:
-            torch.save(mpnn.state_dict(), model_dir + 'mpnn_{}.pt'.format(e + 1))
-            torch.save(pathgnn.state_dict(), model_dir + 'pathgnn_{}.pt'.format(e + 1))
+            torch.save(gnn.state_dict(), model_dir + '{}_{}.pt'.format(gnn_type, e + 1))
+            if gnn_type == 'mpnn':
+                val_gnn = PathMPNN(config).to(device)
+            elif gnn_type == 'pathgnn':
+                val_gnn = PathGNN(config).to(device)
+            else:
+                raise NotImplementedError('{} is an unsupported model'.format(gnn_type))
+            val_gnn.load_state_dict(torch.load(model_dir + '{}_{}.pt'.format(gnn_type, e + 1)))
+            val_gnn.eval()
 
-            val_mpnn, val_pathgnn = PathMPNN(config), PathGNN(config)
-            val_mpnn.load_state_dict(torch.load(model_dir + 'mpnn_{}.pt'.format(e + 1)))
-            val_pathgnn.load_state_dict(torch.load(model_dir + 'pathgnn_{}.pt'.format(e + 1)))
-            val_mpnn.eval(), val_pathgnn.eval()
-
-            mpnn_val_loss, pathgnn_val_loss, num_batch = 0, 0, 0
+            val_loss, num_batch = 0, 0
             for val in val_loader:
-                mpnn_val_batch_loss = val_mpnn(val)
-                mpnn_val_loss += mpnn_val_batch_loss
-
-                pathgnn_val_batch_loss = val_pathgnn(val)
-                pathgnn_val_loss += pathgnn_val_batch_loss
-
+                loss_per_batch = val_gnn(val)
+                val_gnn += loss_per_batch
                 num_batch += 1
-            mpnn_val_loss /= num_batch
-            pathgnn_val_loss /= num_batch
+            val_loss /= num_batch
 
             if logging:
-                wandb.log({'mpnn_val_loss': mpnn_val_loss,
-                           'pathgnn_val_loss': pathgnn_val_loss})
+                wandb.log({'val_loss': val_loss})
 
 
 if __name__ == '__main__':
     # generate_pathgnn_data()
-    run(logging=True)
+    run(device='cuda:2', gnn_type='mpnn', logging=True)
+    run(device='cuda:3', gnn_type='pathgnn', logging=True)
+
+    "TESTING"
+    seed_everything(seed=42)
+    config = OmegaConf.load('config/experiment/FW.yaml')
+    mpnn, pathgnn = PathMPNN(config), PathGNN(config)
+    mpnn.load_state_dict(torch.load('datas/models/0710_154603_pathgnn/mpnn_100.pt'))
+    pathgnn.load_state_dict(torch.load('datas/models/0710_154603_pathgnn/pathgnn_100.pt'))
+    mpnn.eval(), pathgnn.eval()
+
+    test_data = torch.load('datas/pyg/pathgnn/test.pt', map_location='cuda:1')
+    test_loader = DataLoader(test_data, batch_size=config.batch_size, shuffle=True)
+
+    for test in test_loader:
+        mpnn_loss, pathgnn_loss = mpnn(test), pathgnn(test)
+        print(mpnn_loss, pathgnn_loss)

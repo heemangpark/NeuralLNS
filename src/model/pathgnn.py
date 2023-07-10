@@ -180,8 +180,6 @@ class PathGNN(nn.Module):
         self.to(config.device)
 
     def forward(self, batch: Batch) -> torch.Tensor:
-        device = batch.batch.device
-
         nf, ef = self.init_emb(batch)
         n = batch.batch.shape[0] // len(batch)
         pf = self.path_init(batch.batch, len(batch), n, batch.edge_index, ef)
