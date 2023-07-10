@@ -1,10 +1,9 @@
-batch_size: 1000
-device: cuda:3
-map: "8_8_20_5_5"
+batch_size: 100
+device: 'cuda:3'
+map: "16_16_20_20_20"
 
 model: # pytorch-geometric MPNN
-  n_enc_dim: 5
-  e_enc_dim: 2
+  n_enc_dim: 2
   model_dim: 64
   num_layers: 3
   node_aggr: mean  # https://pytorch-geometric.readthedocs.io/en/latest/modules/nn.html#aggregation-operators
@@ -12,6 +11,6 @@ model: # pytorch-geometric MPNN
   residual: True
   loss: L1Loss
 
-optimizer:
-  lr: 1e-4
-  wd: 1e-2
+  optimizer:
+    lr: 1e-4
+    wd: 1e-2

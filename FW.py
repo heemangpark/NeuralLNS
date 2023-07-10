@@ -2,15 +2,17 @@ import os
 import sys
 from datetime import datetime
 
+import networkx as nx
+import numpy as np
 import torch
-import torch_geometric as pyg
 from omegaconf import OmegaConf
+from torch_geometric.data import Data
 from torch_geometric.loader import DataLoader
 from tqdm import tqdm, trange
 
 sys.path.append(os.path.dirname(os.path.abspath(os.path.dirname(__file__))))
 from src.model.pathgnn import PathGNN
-from src.model.pyg_mpnn import MPNN
+from src.model.pyg_mpnn import PathMPNN
 from utils.seed import seed_everything
 
 
@@ -25,22 +27,24 @@ def generate_pathgnn_data():
 
         data_list = []
         for scen in tqdm(scenarios):
-            grid, graph, a_coord, t_coord, y = scen
+            grid, graph, a_coord, t_coord, schedule, y = scen
 
-            empty_coord = list(list(filter(lambda x: list(x) not in a_coord + t_coord, list(graph.nodes()))))
-            coords = torch.Tensor(empty_coord + a_coord + t_coord) / grid.shape[0]
+            nf_coord = torch.Tensor(list(graph.nodes())) / grid.shape[0]
+            nf_type = torch.eye(4)[list(nx.get_node_attributes(graph, 'type').values())]  # TODO: positional encoding
 
-            one_hot = [0 for _ in range(len(empty_coord))] + \
-                      [1 for _ in range(len(a_coord))] + \
-                      [2 for _ in range(len(t_coord))]
-            types = torch.eye(3)[one_hot]
+            nf = torch.cat((nf_coord, nf_type), -1)
+            ef = torch.ones(graph.number_of_edges(), 1)  # TODO: edge feature
 
-            nf = torch.cat((coords, types), -1)
-            ef = torch.ones(graph.number_of_edges() * 2, 1)
+            row = np.array([(g, g + 1) for g in range(grid.shape[0] - 1)])
+            col = row * grid.shape[0]
+            edge_index = []
+            for g in range(grid.shape[0]):
+                edge_index += (row + g * grid.shape[0]).tolist() + (col + g).tolist()
+            edge_index = torch.LongTensor(edge_index).transpose(-1, 0)
 
-            pyg_graph = pyg.utils.from_networkx(graph)
-            pyg_graph.x, pyg_graph.edge_attr, pyg_graph.y = nf, ef, y
-            data_list.append(pyg_graph)
+            data = Data(x=nf, edge_index=edge_index, edge_attr=ef,
+                        schedule=torch.LongTensor(schedule), y=torch.Tensor(y).view(-1, 1))
+            data_list.append(data)
 
         torch.save(data_list, save_dir + '{}.pt'.format(data_type))
 
@@ -54,9 +58,6 @@ def run(logging: bool):
     if not os.path.exists(model_dir):
         os.makedirs(model_dir)
 
-    with open(model_dir + 'config.txt', 'w') as file:
-        file.write('EXP SETUP: ' + str(config))
-
     train_data = torch.load('datas/pyg/pathgnn/train.pt', map_location=config.device)
     train_loader = DataLoader(train_data, batch_size=config.batch_size, shuffle=True)
 
@@ -67,46 +68,52 @@ def run(logging: bool):
         import wandb
         wandb.init(project='FW', name=date, config=dict(setup=config))
 
-    mpnn = MPNN(config)
+    mpnn = PathMPNN(config)
     pathgnn = PathGNN(config)
 
     for e in trange(100):
-        mpnn_epoch_loss, pathgnn_epoch_loss, num_batch = 0, 0, 0
+        mpnn_train_loss, pathgnn_train_loss, num_batch = 0, 0, 0
 
         for tr in train_loader:
-            mpnn_batch_loss, pathgnn_batch_loss = mpnn(tr), pathgnn(tr)
-            mpnn_epoch_loss += mpnn_batch_loss
-            pathgnn_epoch_loss += pathgnn_batch_loss
+            mpnn_batch_loss = mpnn(tr)
+            mpnn_train_loss += mpnn_batch_loss
+
+            pathgnn_batch_loss = pathgnn(tr)
+            pathgnn_train_loss += pathgnn_batch_loss
+
             num_batch += 1
-        mpnn_epoch_loss /= num_batch
-        pathgnn_epoch_loss /= num_batch
+
+        mpnn_train_loss /= num_batch
+        pathgnn_train_loss /= num_batch
 
         if logging:
-            wandb.log({'mpnn_train_loss': mpnn_epoch_loss,
-                       'pathgnn_train_loss': pathgnn_epoch_loss})
+            wandb.log({'mpnn_train_loss': mpnn_train_loss,
+                       'pathgnn_train_loss': pathgnn_train_loss})
 
         if (e + 1) % 10 == 0:
             torch.save(mpnn.state_dict(), model_dir + 'mpnn_{}.pt'.format(e + 1))
-            torch.save(pathgnn.state_dict(), model_dir + 'pathgnn.pt'.format(e + 1))
+            torch.save(pathgnn.state_dict(), model_dir + 'pathgnn_{}.pt'.format(e + 1))
 
-            val_mpnn, val_pathgnn = MPNN(config), PathGNN(config)
-            val_mpnn.load_state_dict(torch.load(model_dir + 'mpnn.pt'.format(e + 1)))
-            val_pathgnn.load_state_dict(torch.load(model_dir + 'pathgnn.pt'.format(e + 1)))
+            val_mpnn, val_pathgnn = PathMPNN(config), PathGNN(config)
+            val_mpnn.load_state_dict(torch.load(model_dir + 'mpnn_{}.pt'.format(e + 1)))
+            val_pathgnn.load_state_dict(torch.load(model_dir + 'pathgnn_{}.pt'.format(e + 1)))
             val_mpnn.eval(), val_pathgnn.eval()
 
-            val_mpnn_loss, val_pathgnn_loss, num_batch = 0, 0, 0
+            mpnn_val_loss, pathgnn_val_loss, num_batch = 0, 0, 0
             for val in val_loader:
-                val_mpnn_batch_loss = val_mpnn(val)
-                val_pathgnn_batch_loss = val_pathgnn(val)
-                val_mpnn_loss += val_mpnn_batch_loss
-                val_pathgnn_loss += val_pathgnn_batch_loss
+                mpnn_val_batch_loss = val_mpnn(val)
+                mpnn_val_loss += mpnn_val_batch_loss
+
+                pathgnn_val_batch_loss = val_pathgnn(val)
+                pathgnn_val_loss += pathgnn_val_batch_loss
+
                 num_batch += 1
-            val_mpnn_loss /= num_batch
-            val_pathgnn_loss /= num_batch
+            mpnn_val_loss /= num_batch
+            pathgnn_val_loss /= num_batch
 
             if logging:
-                wandb.log({'mpnn_val_loss': val_mpnn_loss,
-                           'pathgnn_val_loss': val_pathgnn_loss})
+                wandb.log({'mpnn_val_loss': mpnn_val_loss,
+                           'pathgnn_val_loss': pathgnn_val_loss})
 
 
 if __name__ == '__main__':

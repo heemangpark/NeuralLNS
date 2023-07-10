@@ -1,9 +1,9 @@
-batch_size: 10
-device: 'cuda:0'
+batch_size: 100
+device: 'cuda:3'
 map: "8_8_20_5_5"
 
 model:
-  n_enc_dim: 5
+  n_enc_dim: 6
   e_enc_dim: 1
   model_dim: 64
   num_layers: 3

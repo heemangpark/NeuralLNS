@@ -71,7 +71,8 @@ import torch
 
 def valid_graph(size: int, obs: int, fixed: bool):
     if fixed:
-        temp = np.array([False for _ in range(50)] + [True for _ in range(14)])
+        num_obs = int(size ** 2 * obs / 100)
+        temp = np.array([False for _ in range(size ** 2 - num_obs)] + [True for _ in range(num_obs)])
         random.shuffle(temp)
         temp = temp.reshape(size, size)
         instance = np.ones((size, size)) * temp
@@ -85,7 +86,8 @@ def valid_graph(size: int, obs: int, fixed: bool):
 
     while len(components) != 1:
         if fixed:
-            temp = np.array([False for _ in range(50)] + [True for _ in range(14)])
+            num_obs = int(size ** 2 * obs / 100)
+            temp = np.array([False for _ in range(size ** 2 - num_obs)] + [True for _ in range(num_obs)])
             random.shuffle(temp)
             temp = temp.reshape(size, size)
             instance = np.ones((size, size)) * temp

@@ -9,12 +9,12 @@ from src.nn.pyg_mp_layer import MPLayer
 
 
 class MPNN(nn.Module):
-    def __init__(self, config):
+    def __init__(self, config, edge_type: int):
         super().__init__()
         model_config = config.model
 
         self.node_enc = nn.Linear(model_config.n_enc_dim, model_config.model_dim)
-        self.edge_enc = nn.Linear(model_config.e_enc_dim, model_config.model_dim)
+        self.edge_enc = nn.Linear(edge_type, model_config.model_dim)
 
         self.graph_convs = nn.ModuleList(
             [MPLayer(model_config.node_aggr, model_config.model_dim, model_config.act, model_config.residual)
@@ -29,10 +29,18 @@ class MPNN(nn.Module):
         self.to(config.device)
 
     def forward(self, batch: Batch, type: None):
+        num_object = batch[0].y.shape[0]
         nf, e_id = batch.x, batch.edge_index
-        if type == 'A':
-            ef = torch.cat((batch.edge_attr[:, 0].view(-1, 1), batch.edge_attr[:, 2].view(-1, 1)), dim=-1)
+
+        if type == 'ones':
+            ef = torch.ones_like(batch.edge_attr)[:, 0].view(-1, 1)
+        elif type == 'A':
+            ef = batch.edge_attr[:, 0].view(-1, 1)
         elif type == 'M':
+            ef = batch.edge_attr[:, 1].view(-1, 1)
+        elif type == 'AP':
+            ef = torch.cat((batch.edge_attr[:, 0].view(-1, 1), batch.edge_attr[:, 2].view(-1, 1)), dim=-1)
+        elif type == 'MP':
             ef = torch.cat((batch.edge_attr[:, 1].view(-1, 1), batch.edge_attr[:, 2].view(-1, 1)), dim=-1)
         else:
             ef = batch.edge_attr
@@ -43,41 +51,55 @@ class MPNN(nn.Module):
             nf = graph_conv(nf, e_id, ef)
 
         nf = rearrange(nf, '(N C) L -> N C L', N=len(batch))
-        agent_nf, task_nf = nf[:, -10:-5, :], nf[:, -5:, :]
+        agent_nf, task_nf = nf[:, -num_object * 2:-num_object, :], nf[:, -num_object:, :]
         nf = rearrange(torch.cat((agent_nf, task_nf), -1), 'N C L -> (N C) L')
 
         y_hat = self.mlp(nf)
         label = batch.y.view(-1, 1)
 
-        # num_nodes = batch.ptr.cpu().numpy()
-        # total_types = []
-        # for s, e in zip(num_nodes[:-1], num_nodes[1:]):
-        #     total_types.extend(batch.type[s:e].cpu().numpy())
-        #
-        # nf = rearrange(nf[np.array(total_types) != -1], '(N C) L -> N C L', N=len(batch))
-        # nf_idx = rearrange(batch.type[batch.type != -1], '(N C) -> N C', N=len(batch)).cpu().numpy()
-        # for i in range(len(batch)):
-        #     nf_idx[i] += i * len(batch)
-        #
-        # sort_keys = []
-        # for i in range(len(batch) * 10):
-        #     sort_keys.append(tuple(np.argwhere(nf_idx == i)[0]))
-        #
-        # temp_tensor = torch.zeros_like(torch.cat((nf[sort_keys[0]], nf[sort_keys[0]])).unsqueeze(0))
-        # for i in range(len(batch)):
-        #     for j in range(5):
-        #         feat = torch.cat((nf[sort_keys[i + j]], nf[sort_keys[i + j + 5]])).unsqueeze(0)
-        #         temp_tensor = torch.cat((temp_tensor, feat))
-        # final_nf = temp_tensor[1:]
-
-        # b_nf = rearrange(nf, '(N C) L -> N C L', N=len(batch))
-        # cat_b_nf = rearrange(b_nf, 'N (C1 C2) L -> N C2 (C1 L)', C1=2)
-        #
-        # pred = self.mlp(rearrange(cat_b_nf, 'N C L -> (N C) L'))
-        # y_hat = rearrange(pred, '(N1 N2) C -> N1 (N2 C)', N1=len(batch))
-        # label = rearrange(batch.y, '(N C) -> N C', N=len(batch))
-
         loss = self.loss(y_hat, label)
+        loss.backward()
+
+        self.optimizer.step()
+        self.optimizer.zero_grad()
+
+        return loss.item()
+
+
+class PathMPNN(nn.Module):
+    def __init__(self, config):
+        super().__init__()
+        self.node_enc = nn.Linear(config.model.n_enc_dim, config.model.model_dim)
+        self.edge_enc = nn.Linear(config.model.e_enc_dim, config.model.model_dim)
+
+        self.graph_convs = nn.ModuleList(
+            [MPLayer(config.model.node_aggr, config.model.model_dim, config.model.act, config.model.residual)
+             for _ in range(config.model.num_layers)])
+
+        self.mlp = MLP([config.model.model_dim * 2, config.model.model_dim, config.model.model_dim // 2, 1])
+        self.mlp.reset_parameters()
+
+        self.loss = getattr(nn, config.model.loss)()
+        self.optimizer = Lion(self.parameters(), lr=config.model.optimizer.lr, weight_decay=config.model.optimizer.wd)
+
+        self.to(config.device)
+
+    def forward(self, batch: Batch):
+        nf, e_id, ef = batch.x, batch.edge_index, batch.edge_attr
+
+        nf, ef = self.node_enc(nf), self.edge_enc(ef)
+
+        for graph_conv in self.graph_convs:
+            nf = graph_conv(nf, e_id, ef)
+        nf = rearrange(nf, '(N C) L -> N C L', N=len(batch))
+        sch = rearrange(batch.schedule, '(N C) L -> N C L', N=len(batch))
+
+        sch_nf = torch.cat([rearrange(n[s], 'N C L -> 1 N (C L)') for n, s in zip(nf, sch)])
+        sch_nf = rearrange(sch_nf, 'N C L -> (N C) L')
+
+        y_hat = self.mlp(sch_nf)
+
+        loss = self.loss(y_hat, batch.y)
         loss.backward()
 
         self.optimizer.step()

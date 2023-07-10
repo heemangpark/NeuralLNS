@@ -183,17 +183,21 @@ class PathGNN(nn.Module):
         device = batch.batch.device
 
         nf, ef = self.init_emb(batch)
-        n = nf.shape[0] // batch.num_graphs
-        pf = self.path_init(batch.batch, batch.num_graphs, n, batch.edge_index, ef)
+        n = batch.batch.shape[0] // len(batch)
+        pf = self.path_init(batch.batch, len(batch), n, batch.edge_index, ef)
 
         for path_conv in self.path_convs:
             nf, pf = path_conv(nf, pf, batch.edge_index)
 
         pred = self.dec(pf).squeeze(-1)
-        y_hat = torch.cat([torch.diagonal(p)[-5:] for p in pred]).view(-1)
-        label = torch.Tensor(batch.y).view(-1).to(device)
+        sch = rearrange(batch.schedule, '(N C) L -> N C L', N=len(batch))
 
-        loss = self.loss(y_hat, label)
+        h = []
+        for p, s in zip(pred, sch):
+            h.append([p[_s[0], _s[1]] for _s in s])
+        y_hat = torch.cat([torch.stack(_h) for _h in h]).view(-1, 1)
+
+        loss = self.loss(y_hat, batch.y)
         loss.backward()
 
         self.optimizer.step()
