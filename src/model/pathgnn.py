@@ -177,8 +177,6 @@ class PathGNN(nn.Module):
         self.loss = getattr(nn, model_config.loss)()
         self.optimizer = Lion(self.parameters(), lr=model_config.optimizer.lr, weight_decay=model_config.optimizer.wd)
 
-        self.to(config.device)
-
     def forward(self, batch: Batch) -> torch.Tensor:
         nf, ef = self.init_emb(batch)
         n = batch.batch.shape[0] // len(batch)

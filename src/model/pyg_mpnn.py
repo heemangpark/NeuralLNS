@@ -82,7 +82,6 @@ class PathMPNN(nn.Module):
         self.loss = getattr(nn, config.model.loss)()
         self.optimizer = Lion(self.parameters(), lr=config.model.optimizer.lr, weight_decay=config.model.optimizer.wd)
 
-        self.to(config.device)
 
     def forward(self, batch: Batch):
         nf, e_id, ef = batch.x, batch.edge_index, batch.edge_attr

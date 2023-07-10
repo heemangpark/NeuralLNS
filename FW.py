@@ -1,3 +1,4 @@
+import argparse
 import os
 import sys
 from datetime import datetime
@@ -111,20 +112,24 @@ def run(device: str, gnn_type: str, logging: bool):
 
 if __name__ == '__main__':
     # generate_pathgnn_data()
-    run(device='cuda:2', gnn_type='mpnn', logging=True)
-    run(device='cuda:3', gnn_type='pathgnn', logging=True)
+    parser = argparse.ArgumentParser()
+    parser.add_argument('-d', '--device')
+    parser.add_argument('-g', '--gnn_type')
+    parser.add_argument('-l', '--logging', action=argparse.BooleanOptionalAction, default=True)
+    args = parser.parse_args()
+    run(device=args.device, gnn_type=args.gnn_type, logging=args.logging)
 
-    "TESTING"
-    seed_everything(seed=42)
-    config = OmegaConf.load('config/experiment/FW.yaml')
-    mpnn, pathgnn = PathMPNN(config), PathGNN(config)
-    mpnn.load_state_dict(torch.load('datas/models/0710_154603_pathgnn/mpnn_100.pt'))
-    pathgnn.load_state_dict(torch.load('datas/models/0710_154603_pathgnn/pathgnn_100.pt'))
-    mpnn.eval(), pathgnn.eval()
-
-    test_data = torch.load('datas/pyg/pathgnn/test.pt', map_location='cuda:1')
-    test_loader = DataLoader(test_data, batch_size=config.batch_size, shuffle=True)
-
-    for test in test_loader:
-        mpnn_loss, pathgnn_loss = mpnn(test), pathgnn(test)
-        print(mpnn_loss, pathgnn_loss)
+    # "TESTING"
+    # seed_everything(seed=42)
+    # config = OmegaConf.load('config/experiment/FW.yaml')
+    # mpnn, pathgnn = PathMPNN(config), PathGNN(config)
+    # mpnn.load_state_dict(torch.load('datas/models/0710_154603_pathgnn/mpnn_100.pt'))
+    # pathgnn.load_state_dict(torch.load('datas/models/0710_154603_pathgnn/pathgnn_100.pt'))
+    # mpnn.eval(), pathgnn.eval()
+    #
+    # test_data = torch.load('datas/pyg/pathgnn/test.pt', map_location='cuda:1')
+    # test_loader = DataLoader(test_data, batch_size=config.batch_size, shuffle=True)
+    #
+    # for test in test_loader:
+    #     mpnn_loss, pathgnn_loss = mpnn(test), pathgnn(test)
+    #     print(mpnn_loss, pathgnn_loss)
