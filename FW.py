@@ -67,7 +67,7 @@ def run(device: str, gnn_type: str, logging: bool):
 
     if logging:
         import wandb
-        wandb.init(project='FW', name=gnn_type, config=dict(setup=config))
+        wandb.init(project='FW', name='{}_{}'.format(gnn_type, config.model.num_layers), config=dict(setup=config))
 
     if gnn_type == 'mpnn':
         gnn = PathMPNN(config).to(device)

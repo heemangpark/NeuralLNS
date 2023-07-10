@@ -5,8 +5,9 @@ model:
   n_enc_dim: 6
   e_enc_dim: 1
   model_dim: 64
-  num_layers: 16
-  node_aggr: mean  # https://pytorch-geometric.readthedocs.io/en/latest/modules/nn.html#aggregation-operators
+  num_layers: 32
+  node_aggr: add  # https://pytorch-geometric.readthedocs.io/en/latest/modules/nn.html#aggregation-operators
+  path_aggr: max  # only for pathgnn
   act: ReLU
   residual: True
   loss: L1Loss

@@ -159,23 +159,22 @@ class PathInit(nn.Module):
 class PathGNN(nn.Module):
     def __init__(self, config):
         super().__init__()
-        model_config = config.model
+        self.init_emb = MOMDInitEmbedding(config.model.n_enc_dim, config.model.e_enc_dim, config.model.model_dim)
+        self.path_init = PathInit(config.model.model_dim, config.model.model_dim)
 
-        self.init_emb = MOMDInitEmbedding(model_config.n_enc_dim, model_config.e_enc_dim, model_config.model_dim)
-        self.path_init = PathInit(model_config.model_dim, model_config.model_dim)
-
-        self.num_layers = model_config.num_layers
+        self.num_layers = config.model.num_layers
         self.path_convs = nn.ModuleList(
             [
-                PathConvModule(model_config.model_dim, "ReLU", "max", "add", True)
-                for _ in range(model_config.num_layers)
+                PathConvModule(config.model.model_dim, config.model.act,
+                               config.model.path_aggr, config.model.node_aggr, config.model.residual)
+                for _ in range(config.model.num_layers)
             ]
         )
 
-        self.dec = nn.Linear(model_config.model_dim, model_config.e_enc_dim)
+        self.dec = nn.Linear(config.model.model_dim, config.model.e_enc_dim)
 
-        self.loss = getattr(nn, model_config.loss)()
-        self.optimizer = Lion(self.parameters(), lr=model_config.optimizer.lr, weight_decay=model_config.optimizer.wd)
+        self.loss = getattr(nn, config.model.loss)()
+        self.optimizer = Lion(self.parameters(), lr=config.model.optimizer.lr, weight_decay=config.model.optimizer.wd)
 
     def forward(self, batch: Batch) -> torch.Tensor:
         nf, ef = self.init_emb(batch)
