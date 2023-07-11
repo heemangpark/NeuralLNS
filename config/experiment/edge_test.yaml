@@ -1,12 +1,12 @@
 batch_size: 100
 device: 'cuda:3'
-map: "16_16_20_20_20"
+map: "8_8_20_5_5"
 
 model: # pytorch-geometric MPNN
   n_enc_dim: 2
   model_dim: 64
-  num_layers: 3
-  node_aggr: mean  # https://pytorch-geometric.readthedocs.io/en/latest/modules/nn.html#aggregation-operators
+  num_layers: 8
+  node_aggr: add  # https://pytorch-geometric.readthedocs.io/en/latest/modules/nn.html#aggregation-operators
   act: ReLU
   residual: True
   loss: L1Loss

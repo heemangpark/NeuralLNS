@@ -9,38 +9,43 @@ from src.nn.pyg_mp_layer import MPLayer
 
 
 class MPNN(nn.Module):
-    def __init__(self, config, edge_type: int):
+    def __init__(self, config, edge_type: str):
         super().__init__()
         model_config = config.model
 
         self.node_enc = nn.Linear(model_config.n_enc_dim, model_config.model_dim)
-        self.edge_enc = nn.Linear(edge_type, model_config.model_dim)
+        self.edge_enc = nn.Linear(len(edge_type), model_config.model_dim)
 
         self.graph_convs = nn.ModuleList(
-            [MPLayer(model_config.node_aggr, model_config.model_dim, model_config.act, model_config.residual)
-             for _ in range(model_config.num_layers)])
+            [
+                MPLayer(model_config.node_aggr, model_config.model_dim, model_config.act, model_config.residual)
+                for _ in range(model_config.num_layers)
+            ]
+        )
 
         self.mlp = MLP([model_config.model_dim * 2, model_config.model_dim, model_config.model_dim // 2, 1])
         self.mlp.reset_parameters()
 
         self.loss = getattr(nn, model_config.loss)()
-        self.optimizer = Lion(self.parameters(), lr=model_config.optimizer.lr, weight_decay=model_config.optimizer.wd)
+        self.optimizer = Lion(
+            self.parameters(),
+            lr=model_config.optimizer.lr,
+            weight_decay=model_config.optimizer.wd
+        )
 
-        self.to(config.device)
-
-    def forward(self, batch: Batch, type: None):
+    def forward(self, batch: Batch, edge_type: str):
         num_object = batch[0].y.shape[0]
         nf, e_id = batch.x, batch.edge_index
 
-        if type == 'ones':
+        if edge_type == 'o':
             ef = torch.ones_like(batch.edge_attr)[:, 0].view(-1, 1)
-        elif type == 'A':
+        elif edge_type == 'A':
             ef = batch.edge_attr[:, 0].view(-1, 1)
-        elif type == 'M':
+        elif edge_type == 'M':
             ef = batch.edge_attr[:, 1].view(-1, 1)
-        elif type == 'AP':
+        elif edge_type == 'AP':
             ef = torch.cat((batch.edge_attr[:, 0].view(-1, 1), batch.edge_attr[:, 2].view(-1, 1)), dim=-1)
-        elif type == 'MP':
+        elif edge_type == 'MP':
             ef = torch.cat((batch.edge_attr[:, 1].view(-1, 1), batch.edge_attr[:, 2].view(-1, 1)), dim=-1)
         else:
             ef = batch.edge_attr
@@ -81,7 +86,6 @@ class PathMPNN(nn.Module):
 
         self.loss = getattr(nn, config.model.loss)()
         self.optimizer = Lion(self.parameters(), lr=config.model.optimizer.lr, weight_decay=config.model.optimizer.wd)
-
 
     def forward(self, batch: Batch):
         nf, e_id, ef = batch.x, batch.edge_index, batch.edge_attr

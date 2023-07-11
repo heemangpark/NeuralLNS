@@ -101,9 +101,6 @@ def pyg_data(scen_config: str, graph_type: str = 'homo'):
         for data_type in ['train', 'val', 'test']:
 
             scenarios = torch.load('datas/scenarios/{}/{}.pt'.format(scen_config, data_type))
-            ################################################################
-            scenarios = scenarios[:len(scenarios) // 10]
-            ################################################################
             save_dir = 'datas/pyg/{}/'.format(scen_config)
             if not os.path.exists(save_dir):
                 os.makedirs(save_dir)
@@ -209,7 +206,7 @@ def pyg_data(scen_config: str, graph_type: str = 'homo'):
         raise ValueError('supports only homogeneous and heterogeneous graphs')
 
 
-def run(logging: bool = False):
+def run(device: str, edge_type: str, logging: bool = False):
     seed_everything(seed=42)
     configs = OmegaConf.load('config/experiment/edge_test.yaml')
 
@@ -218,122 +215,47 @@ def run(logging: bool = False):
     if not os.path.exists(model_dir):
         os.makedirs(model_dir)
 
-    train_data = torch.load('datas/pyg/{}/train.pt'.format(configs.map), map_location=configs.device)
+    train_data = torch.load('datas/pyg/{}/train.pt'.format(configs.map), map_location=device)
     train_loader = DataLoader(train_data, batch_size=configs.batch_size, shuffle=True)
-    val_data = torch.load('datas/pyg/{}/val.pt'.format(configs.map), map_location=configs.device)
+    val_data = torch.load('datas/pyg/{}/val.pt'.format(configs.map), map_location=device)
     val_loader = DataLoader(val_data, batch_size=configs.batch_size, shuffle=True)
 
     if logging:
         import wandb
-        wandb.init(project='NeuralLNS', name=date)
+        wandb.init(project='NeuralLNS', name='{}_{}'.format(edge_type, date))
 
-    GNN_ones, GNN_A, GNN_M = [MPNN(configs, edge_type=1) for _ in range(3)]
-    GNN_AP, GNN_MP = [MPNN(configs, edge_type=2) for _ in range(2)]
-    GNN_AMP = MPNN(configs, edge_type=3)
+    GNN = MPNN(configs, edge_type).to(device)
 
     for e in trange(100):
-        num_batch, e_ones, e_A, e_M, e_AP, e_MP, e_AMP = [0 for _ in range(7)]
+        train_loss, num_batch = 0, 0
 
         for train in train_loader:
-            b_ones = GNN_ones(train, type='ones')
-            b_A = GNN_A(train, type='A')
-            b_M = GNN_M(train, type='M')
-            b_AP = GNN_AP(train, type='AP')
-            b_MP = GNN_MP(train, type='MP')
-            b_AMP = GNN_AMP(train, type='AMP')
-            e_ones += b_ones
-            e_A += b_A
-            e_M += b_M
-            e_AP += b_AP
-            e_MP += b_MP
-            e_AMP += b_AMP
+            batch_loss = GNN(train, edge_type)
+            train_loss += batch_loss
             num_batch += 1
-
-        e_ones /= num_batch
-        e_A /= num_batch
-        e_M /= num_batch
-        e_AP /= num_batch
-        e_MP /= num_batch
-        e_AMP /= num_batch
+        train_loss /= num_batch
 
         if logging:
-            wandb.log({'one_train_loss': e_ones,
-                       'A_train_loss': e_A,
-                       'M_train_loss': e_M,
-                       'AP_train_loss': e_AP,
-                       'MP_train_loss': e_MP,
-                       'AMP_train_loss': e_AMP})
+            wandb.log({'train_loss': train_loss})
 
         if (e + 1) % 10 == 0:
-            torch.save(GNN_ones.state_dict(), model_dir + 'ones_{}.pt'.format(e + 1))
-            torch.save(GNN_A.state_dict(), model_dir + 'A_{}.pt'.format(e + 1))
-            torch.save(GNN_M.state_dict(), model_dir + 'M_{}.pt'.format(e + 1))
-            torch.save(GNN_AP.state_dict(), model_dir + 'AP_{}.pt'.format(e + 1))
-            torch.save(GNN_MP.state_dict(), model_dir + 'MP_{}.pt'.format(e + 1))
-            torch.save(GNN_AMP.state_dict(), model_dir + 'AMP_{}.pt'.format(e + 1))
+            torch.save(GNN.state_dict(), model_dir + '{}_{}.pt'.format(edge_type, e + 1))
+            val_GNN = MPNN(configs, edge_type).to(device)
+            val_GNN.load_state_dict(torch.load(model_dir + '{}_{}.pt'.format(edge_type, e + 1)))
+            val_GNN.eval()
 
-            val_GNN_ones, val_GNN_A, val_GNN_M = [MPNN(configs, edge_type=1) for _ in range(3)]
-            val_GNN_AP, val_GNN_MP = [MPNN(configs, edge_type=2) for _ in range(2)]
-            val_GNN_AMP = MPNN(configs, edge_type=3)
-
-            val_GNN_ones.load_state_dict(torch.load(model_dir + 'ones_{}.pt'.format(e + 1)))
-            val_GNN_A.load_state_dict(torch.load(model_dir + 'A_{}.pt'.format(e + 1)))
-            val_GNN_M.load_state_dict(torch.load(model_dir + 'M_{}.pt'.format(e + 1)))
-            val_GNN_AP.load_state_dict(torch.load(model_dir + 'AP_{}.pt'.format(e + 1)))
-            val_GNN_MP.load_state_dict(torch.load(model_dir + 'MP_{}.pt'.format(e + 1)))
-            val_GNN_AMP.load_state_dict(torch.load(model_dir + 'AMP_{}.pt'.format(e + 1)))
-
-            val_GNN_ones.eval()
-            val_GNN_A.eval()
-            val_GNN_M.eval()
-            val_GNN_AP.eval()
-            val_GNN_MP.eval()
-            val_GNN_AMP.eval()
-
-            num_batch, v_ones, v_A, v_M, v_AP, v_MP, v_AMP = [0 for _ in range(7)]
+            val_loss, num_batch = 0, 0
             for val in val_loader:
-                v_b_ones = val_GNN_ones(val, type='ones')
-                v_b_A = val_GNN_A(val, type='A')
-                v_b_M = val_GNN_M(val, type='M')
-                v_b_AP = val_GNN_AP(val, type='AP')
-                v_b_MP = val_GNN_MP(val, type='MP')
-                v_b_AMP = val_GNN_AMP(val, type='AMP')
-
-                v_ones += v_b_ones
-                v_A += v_b_A
-                v_M += v_b_M
-                v_AP += v_b_AP
-                v_MP += v_b_MP
-                v_AMP += v_b_AMP
+                batch_loss = val_GNN(val, edge_type)
+                val_loss += batch_loss
                 num_batch += 1
-
-            v_ones /= num_batch
-            v_A /= num_batch
-            v_M /= num_batch
-            v_AP /= num_batch
-            v_MP /= num_batch
-            v_AMP /= num_batch
+            val_loss /= num_batch
 
             if logging:
-                wandb.log({'ones_val_loss': v_ones,
-                           'A_val_loss': v_A,
-                           'M_val_loss': v_M,
-                           'AP_val_loss': v_AP,
-                           'MP_val_loss': v_MP,
-                           'AMP_val_loss': v_AMP})
+                wandb.log({'val_loss': val_loss})
 
 
 if __name__ == '__main__':
     # pyg_data('16_16_20_20_20')
     # pyg_data('16_16_partition_20_20')
-    run(logging=True)
-
-    # configs = OmegaConf.load('config/experiment/edge_test.yaml')
-    # test_data = torch.load('datas/pyg/16_16_20_20_20/test.pt', map_location='cuda:3')
-    # test_loader = DataLoader(test_data, batch_size=1000, shuffle=True)
-    # GNN_A, GNN_M = MPNN(configs, edge_type=1), MPNN(configs, edge_type=1)
-    # GNN_A.load_state_dict(torch.load('datas/models/0705_163312_edge_test/A_100.pt'))
-    # GNN_M.load_state_dict(torch.load('datas/models/0705_163312_edge_test/M_100.pt'))
-    # GNN_A.eval(), GNN_M.eval()
-    # for test in test_loader:
-    #     A, M = GNN_A(test, type='A'), GNN_M(test, type='M')
+    run(device='cuda:3', edge_type='AMP', logging=True)
