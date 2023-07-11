@@ -5,6 +5,7 @@ from lion_pytorch import Lion
 from torch_geometric.data import Batch
 from torch_geometric.nn.models import MLP
 
+from src.nn.mlp import MLP
 from src.nn.pyg_mp_layer import MPLayer
 
 
@@ -23,8 +24,9 @@ class MPNN(nn.Module):
             ]
         )
 
-        self.mlp = MLP([model_config.model_dim * 2, model_config.model_dim, model_config.model_dim // 2, 1])
-        self.mlp.reset_parameters()
+        self.mlp = MLP(model_config.model_dim * 2, model_config.model_dim, 1)
+        # self.mlp = MLP([model_config.model_dim * 2, model_config.model_dim, model_config.model_dim // 2, 1])
+        # self.mlp.reset_parameters()
 
         self.loss = getattr(nn, model_config.loss)()
         self.optimizer = Lion(

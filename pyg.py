@@ -258,4 +258,4 @@ def run(device: str, edge_type: str, logging: bool = False):
 if __name__ == '__main__':
     # pyg_data('16_16_20_20_20')
     # pyg_data('16_16_partition_20_20')
-    run(device='cuda:3', edge_type='AMP', logging=True)
+    run(device='cuda:3', edge_type='AMP', logging=False)
