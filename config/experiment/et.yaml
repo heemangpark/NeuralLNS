@@ -1,0 +1,17 @@
+batch_size: 100
+map: "8_8_20_5_5"
+
+model:
+  n_enc_dim: 6
+  e_enc_dim: 1
+  model_dim: 16
+  num_layers: 8
+  node_aggr: add  # https://pytorch-geometric.readthedocs.io/en/latest/modules/nn.html#aggregation-operators
+  path_aggr: max  # only for pathgnn
+  act: ReLU
+  residual: True
+  loss: L1Loss
+
+  optimizer:
+    lr: 1e-4
+    wd: 1e-2
