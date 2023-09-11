@@ -1,9 +1,9 @@
 import copy
-import math
 import os
 import pickle
 import random
 import sys
+import time
 from pathlib import Path
 
 import numpy as np
@@ -20,79 +20,254 @@ from utils.seed import seed_everything
 from utils.solver import solver
 
 
-def test_sequential(device: str, map_size):
-    seed_everything(seed=42)
+def divide_map(a_t_ratio, schedule, coords, edge_index, types):
+    agent_task_list = [[] for _ in range(a_t_ratio + 1)]
+    for idx in range(a_t_ratio + 1):
+        agent_task_list[idx].extend([sch[idx] for sch in schedule])
+
+    nf_coord = torch.Tensor(coords)
+    nf_coord = (nf_coord - nf_coord.min()) / (nf_coord.max() + nf_coord.min())
+    edge_index = torch.LongTensor(edge_index).transpose(-1, 0)
+
+    mask_type = [copy.deepcopy(types) for _ in range(a_t_ratio)]
+
+    if a_t_ratio == 3:
+        for a, t1, t2, t3 in zip(agent_task_list[0], agent_task_list[1],
+                                 agent_task_list[2], agent_task_list[3]):
+            mask_type[0][t2] = 0
+            mask_type[0][t3] = 0
+
+            mask_type[1][a] = 0
+            mask_type[1][t1] = 2
+            mask_type[1][t3] = 0
+
+            mask_type[2][a] = 0
+            mask_type[2][t1] = 0
+            mask_type[2][t2] = 2
+
+        nf_1 = torch.cat((nf_coord, torch.eye(4)[mask_type[0]]), -1)
+        nf_2 = torch.cat((nf_coord, torch.eye(4)[mask_type[1]]), -1)
+        nf_3 = torch.cat((nf_coord, torch.eye(4)[mask_type[2]]), -1)
+
+        sch_1 = [(sch[0], sch[1]) for sch in schedule]
+        sch_2 = [(sch[1], sch[2]) for sch in schedule]
+        sch_3 = [(sch[2], sch[3]) for sch in schedule]
+
+        map_data = [Data(x=nf_1, edge_index=edge_index, edge_attr=torch.ones(edge_index.shape[-1], 1),
+                         schedule=torch.LongTensor(sch_1)),
+                    Data(x=nf_2, edge_index=edge_index, edge_attr=torch.ones(edge_index.shape[-1], 1),
+                         schedule=torch.LongTensor(sch_2)),
+                    Data(x=nf_3, edge_index=edge_index, edge_attr=torch.ones(edge_index.shape[-1], 1),
+                         schedule=torch.LongTensor(sch_3))]
+
+    elif a_t_ratio == 4:
+        for a, t1, t2, t3, t4 in zip(agent_task_list[0], agent_task_list[1],
+                                     agent_task_list[2], agent_task_list[3], agent_task_list[4]):
+            mask_type[0][t2] = 0
+            mask_type[0][t3] = 0
+            mask_type[0][t4] = 0
+
+            mask_type[1][a] = 0
+            mask_type[1][t1] = 2
+            mask_type[1][t3] = 0
+            mask_type[1][t4] = 0
+
+            mask_type[2][a] = 0
+            mask_type[2][t1] = 0
+            mask_type[2][t2] = 2
+            mask_type[2][t4] = 0
+
+            mask_type[3][a] = 0
+            mask_type[3][t1] = 0
+            mask_type[3][t2] = 0
+            mask_type[3][t3] = 2
+
+        nf_1 = torch.cat((nf_coord, torch.eye(4)[mask_type[0]]), -1)
+        nf_2 = torch.cat((nf_coord, torch.eye(4)[mask_type[1]]), -1)
+        nf_3 = torch.cat((nf_coord, torch.eye(4)[mask_type[2]]), -1)
+        nf_4 = torch.cat((nf_coord, torch.eye(4)[mask_type[3]]), -1)
+
+        sch_1 = [(sch[0], sch[1]) for sch in schedule]
+        sch_2 = [(sch[1], sch[2]) for sch in schedule]
+        sch_3 = [(sch[2], sch[3]) for sch in schedule]
+        sch_4 = [(sch[3], sch[4]) for sch in schedule]
+
+        map_data = [Data(x=nf_1, edge_index=edge_index, edge_attr=torch.ones(edge_index.shape[-1], 1),
+                         schedule=torch.LongTensor(sch_1)),
+                    Data(x=nf_2, edge_index=edge_index, edge_attr=torch.ones(edge_index.shape[-1], 1),
+                         schedule=torch.LongTensor(sch_2)),
+                    Data(x=nf_3, edge_index=edge_index, edge_attr=torch.ones(edge_index.shape[-1], 1),
+                         schedule=torch.LongTensor(sch_3)),
+                    Data(x=nf_4, edge_index=edge_index, edge_attr=torch.ones(edge_index.shape[-1], 1),
+                         schedule=torch.LongTensor(sch_4))]
+
+    elif a_t_ratio == 5:
+        for a, t1, t2, t3, t4, t5 in zip(agent_task_list[0], agent_task_list[1], agent_task_list[2],
+                                         agent_task_list[3], agent_task_list[4], agent_task_list[5]):
+            mask_type[0][t2] = 0
+            mask_type[0][t3] = 0
+            mask_type[0][t4] = 0
+            mask_type[0][t5] = 0
+
+            mask_type[1][a] = 0
+            mask_type[1][t1] = 2
+            mask_type[1][t3] = 0
+            mask_type[1][t4] = 0
+            mask_type[1][t5] = 0
+
+            mask_type[2][a] = 0
+            mask_type[2][t1] = 0
+            mask_type[2][t2] = 2
+            mask_type[2][t4] = 0
+            mask_type[2][t5] = 0
+
+            mask_type[3][a] = 0
+            mask_type[3][t1] = 0
+            mask_type[3][t2] = 0
+            mask_type[3][t3] = 2
+            mask_type[3][t5] = 0
+
+            mask_type[4][a] = 0
+            mask_type[4][t1] = 0
+            mask_type[4][t2] = 0
+            mask_type[4][t3] = 0
+            mask_type[4][t4] = 2
+
+        nf_1 = torch.cat((nf_coord, torch.eye(4)[mask_type[0]]), -1)
+        nf_2 = torch.cat((nf_coord, torch.eye(4)[mask_type[1]]), -1)
+        nf_3 = torch.cat((nf_coord, torch.eye(4)[mask_type[2]]), -1)
+        nf_4 = torch.cat((nf_coord, torch.eye(4)[mask_type[3]]), -1)
+        nf_5 = torch.cat((nf_coord, torch.eye(4)[mask_type[4]]), -1)
+
+        sch_1 = [(sch[0], sch[1]) for sch in schedule]
+        sch_2 = [(sch[1], sch[2]) for sch in schedule]
+        sch_3 = [(sch[2], sch[3]) for sch in schedule]
+        sch_4 = [(sch[3], sch[4]) for sch in schedule]
+        sch_5 = [(sch[4], sch[5]) for sch in schedule]
+
+        map_data = [Data(x=nf_1, edge_index=edge_index, edge_attr=torch.ones(edge_index.shape[-1], 1),
+                         schedule=torch.LongTensor(sch_1)),
+                    Data(x=nf_2, edge_index=edge_index, edge_attr=torch.ones(edge_index.shape[-1], 1),
+                         schedule=torch.LongTensor(sch_2)),
+                    Data(x=nf_3, edge_index=edge_index, edge_attr=torch.ones(edge_index.shape[-1], 1),
+                         schedule=torch.LongTensor(sch_3)),
+                    Data(x=nf_4, edge_index=edge_index, edge_attr=torch.ones(edge_index.shape[-1], 1),
+                         schedule=torch.LongTensor(sch_4)),
+                    Data(x=nf_5, edge_index=edge_index, edge_attr=torch.ones(edge_index.shape[-1], 1),
+                         schedule=torch.LongTensor(sch_5))]
+
+    elif a_t_ratio == 6:
+        for a, t1, t2, t3, t4, t5, t6 in zip(agent_task_list[0], agent_task_list[1], agent_task_list[2],
+                                             agent_task_list[3], agent_task_list[4], agent_task_list[5],
+                                             agent_task_list[6]):
+            mask_type[0][t2] = 0
+            mask_type[0][t3] = 0
+            mask_type[0][t4] = 0
+            mask_type[0][t5] = 0
+            mask_type[0][t6] = 0
+
+            mask_type[1][a] = 0
+            mask_type[1][t1] = 2
+            mask_type[1][t3] = 0
+            mask_type[1][t4] = 0
+            mask_type[1][t5] = 0
+            mask_type[1][t6] = 0
+
+            mask_type[2][a] = 0
+            mask_type[2][t1] = 0
+            mask_type[2][t2] = 2
+            mask_type[2][t4] = 0
+            mask_type[2][t5] = 0
+            mask_type[2][t6] = 0
+
+            mask_type[3][a] = 0
+            mask_type[3][t1] = 0
+            mask_type[3][t2] = 0
+            mask_type[3][t3] = 2
+            mask_type[3][t5] = 0
+            mask_type[3][t6] = 0
+
+            mask_type[4][a] = 0
+            mask_type[4][t1] = 0
+            mask_type[4][t2] = 0
+            mask_type[4][t3] = 0
+            mask_type[4][t4] = 2
+            mask_type[4][t6] = 0
+
+            mask_type[5][a] = 0
+            mask_type[5][t1] = 0
+            mask_type[5][t2] = 0
+            mask_type[5][t3] = 0
+            mask_type[5][t4] = 0
+            mask_type[5][t5] = 2
+
+        nf_1 = torch.cat((nf_coord, torch.eye(4)[mask_type[0]]), -1)
+        nf_2 = torch.cat((nf_coord, torch.eye(4)[mask_type[1]]), -1)
+        nf_3 = torch.cat((nf_coord, torch.eye(4)[mask_type[2]]), -1)
+        nf_4 = torch.cat((nf_coord, torch.eye(4)[mask_type[3]]), -1)
+        nf_5 = torch.cat((nf_coord, torch.eye(4)[mask_type[4]]), -1)
+        nf_6 = torch.cat((nf_coord, torch.eye(4)[mask_type[5]]), -1)
+
+        sch_1 = [(sch[0], sch[1]) for sch in schedule]
+        sch_2 = [(sch[1], sch[2]) for sch in schedule]
+        sch_3 = [(sch[2], sch[3]) for sch in schedule]
+        sch_4 = [(sch[3], sch[4]) for sch in schedule]
+        sch_5 = [(sch[4], sch[5]) for sch in schedule]
+        sch_6 = [(sch[5], sch[6]) for sch in schedule]
+
+        map_data = [Data(x=nf_1, edge_index=edge_index, edge_attr=torch.ones(edge_index.shape[-1], 1),
+                         schedule=torch.LongTensor(sch_1)),
+                    Data(x=nf_2, edge_index=edge_index, edge_attr=torch.ones(edge_index.shape[-1], 1),
+                         schedule=torch.LongTensor(sch_2)),
+                    Data(x=nf_3, edge_index=edge_index, edge_attr=torch.ones(edge_index.shape[-1], 1),
+                         schedule=torch.LongTensor(sch_3)),
+                    Data(x=nf_4, edge_index=edge_index, edge_attr=torch.ones(edge_index.shape[-1], 1),
+                         schedule=torch.LongTensor(sch_4)),
+                    Data(x=nf_5, edge_index=edge_index, edge_attr=torch.ones(edge_index.shape[-1], 1),
+                         schedule=torch.LongTensor(sch_5)),
+                    Data(x=nf_6, edge_index=edge_index, edge_attr=torch.ones(edge_index.shape[-1], 1),
+                         schedule=torch.LongTensor(sch_6))]
+
+    else:
+        raise NotImplementedError('Supports Agent Task Ratio from 3~6 only')
+
+    return map_data
+
+
+def test_pred(obs_dens, map_con, device, single=False):
+    seed_everything()
     config = OmegaConf.load('config/experiment/rt.yaml')
-    test_data = torch.load('data/{}_multi/3.pt'.format(map_size), map_location=device)
+    if not single:
+        test_data = torch.load('data/{}/{}.pt'.format(obs_dens, map_con), map_location=device)
+    else:
+        test_data = torch.load('data/single/{}_{}.pt'.format(obs_dens, map_con), map_location=device)
+
+    gnn = RelationalTransformer(config).to(device)
+    gnn.load_state_dict(torch.load('data/models/rt_8_sum.pt'))
+    gnn.eval()
 
     pred_list = []
     label_list = [td[-1].item() for td in test_data]
-    # label_list.pop(4642)
     label_list = np.array(label_list)
     label_list = (label_list - label_list.mean()) / (label_list.std() + 1e-5)
     label_list = label_list.tolist()
 
-    batch_size = 10
+    batch_size = 100
     for b_id in trange(len(test_data) // batch_size):
         batch_data = []
+
         for td in test_data[b_id * batch_size: (b_id + 1) * batch_size]:
             coords, types, edge_index, schedule, _ = td
-
-            agent_task_list = [[] for _ in range(4)]
-            for idx in range(4):
-                agent_task_list[idx].extend([sch[idx] for sch in schedule])
-
-            nf_coord = torch.Tensor(coords)
-            nf_coord = (nf_coord - nf_coord.min()) / (nf_coord.max() + nf_coord.min())
-            edge_index = torch.LongTensor(edge_index).transpose(-1, 0)
-
-            mask_type = [copy.deepcopy(types) for _ in range(3)]
-            for a, t1, t2, t3 in zip(agent_task_list[0], agent_task_list[1], agent_task_list[2], agent_task_list[3]):
-                mask_type[0][t2] = 0  # t2, t3 -> 0
-                mask_type[0][t3] = 0
-
-                mask_type[1][a] = 0  # a -> 0 | t1 -> 2 | t3 -> 0
-                mask_type[1][t1] = 2
-                mask_type[1][t3] = 0
-
-                mask_type[2][a] = 0  # a, t1 -> 0 | t2 -> 2
-                mask_type[2][t1] = 0
-                mask_type[2][t2] = 2
-
-            nf_1 = torch.cat((nf_coord, torch.eye(4)[mask_type[0]]), -1)
-            nf_2 = torch.cat((nf_coord, torch.eye(4)[mask_type[1]]), -1)
-            nf_3 = torch.cat((nf_coord, torch.eye(4)[mask_type[2]]), -1)
-
-            sch_1 = [(sch[0], sch[1]) for sch in schedule]
-            sch_2 = [(sch[1], sch[2]) for sch in schedule]
-            sch_3 = [(sch[2], sch[3]) for sch in schedule]
-
-            batch_data += [Data(x=nf_1, edge_index=edge_index, edge_attr=torch.ones(edge_index.shape[-1], 1),
-                                schedule=torch.LongTensor(sch_1)),
-                           Data(x=nf_2, edge_index=edge_index, edge_attr=torch.ones(edge_index.shape[-1], 1),
-                                schedule=torch.LongTensor(sch_2)),
-                           Data(x=nf_3, edge_index=edge_index, edge_attr=torch.ones(edge_index.shape[-1], 1),
-                                schedule=torch.LongTensor(sch_3))]
+            map_data = divide_map(int(map_con.split('_')[2]) // int(map_con.split('_')[1]),
+                                  schedule, coords, edge_index, types)
+            batch_data += map_data
 
         data = Batch.from_data_list(batch_data).to(device)
-
-        gnn = RelationalTransformer(config).to(device)
-        gnn.load_state_dict(torch.load('data/models/rt_8_sum.pt'))
-        gnn.eval()
-
         pred = gnn(data, test=True)
         pred = rearrange(pred, '(N C) -> N C', N=batch_size)
         pred_list.extend(pred.sum(-1))
 
-    plt.clf()
-    # pred_list.pop(4642)
-    plt.plot(pred_list, label_list, 'b.')
-    criterion = range(math.floor(min(pred_list + label_list)), math.ceil(max(pred_list + label_list)))
-    plt.plot(criterion, criterion, 'r--')
-    plt.xlabel('preds')
-    plt.ylabel('labels')
-    plt.title('rt_sequential')
-    plt.show()
+    return pred_list, label_list
 
 
 def convert_to_data(coords, types, e_id, sch):
@@ -252,17 +427,17 @@ def LNS(map_data, prev_sch, batch_size, dc):
                            [s[1:] if len(s) != 1 else [] for s in modified_schedule]],
                           os.path.join(Path(os.path.realpath(__file__)).parent, 'PBS/pyg/'), 'heu_lns_' + dc)[0]
             if cost != 'retry':
+                modified_schedule_set.append(modified_schedule)
+                cost_set.append(cost)
                 break
             else:
-                modified_schedule_set.append(modified_schedule)
                 step_count -= 1
-
-        cost_set.append(cost)
 
     return modified_schedule_set[cost_set.index(min(cost_set))], min(cost_set)
 
 
-def run_nn(data, device, sample_per_steps=100, config=''):
+def run_nn(data, device, sample_per_steps=50, config='', max_time=120, time_step=3):
+    time_list = list(range(time_step, max_time + 1, time_step))
     seed_everything()
 
     coords, types, edge_index, schedule, _ = data
@@ -276,9 +451,15 @@ def run_nn(data, device, sample_per_steps=100, config=''):
                   os.path.join(Path(os.path.realpath(__file__)).parent, 'PBS/pyg/'), 'nn_' + config)[0]
     output = [cost]
 
-    for itr in range(1, 301):
+    total_time = 0
+    while True:
         while True:
+            algo_start = time.time()
             next_schedule = NLNS(map_data, schedule, device, sample_per_steps)
+            algo_end = time.time()
+            algo_spend = algo_end - algo_start
+            total_time += algo_spend
+
             next_cost = solver(grid,
                                [list(coords[s[0]]) for s in next_schedule],
                                [[list(coords[_ts]) for _ts in ts] for ts in
@@ -292,12 +473,17 @@ def run_nn(data, device, sample_per_steps=100, config=''):
             cost = next_cost
         else:
             pass
-        output.append(cost)
 
-    return output
+        if total_time >= time_list[0]:
+            output.append(cost)
+            time_list.pop(0)
+
+            if len(time_list) == 0:
+                return output
 
 
-def run_heu(data, sample_per_steps: int = 100, ran=False, config=''):
+def run_heu(data, sample_per_steps: int = 100, ran=False, config='', max_time=120, time_step=3):
+    time_list = list(range(time_step, max_time + 1, time_step))
     seed_everything()
 
     coords, types, _, schedule, _ = data
@@ -311,78 +497,117 @@ def run_heu(data, sample_per_steps: int = 100, ran=False, config=''):
                   os.path.join(Path(os.path.realpath(__file__)).parent, 'PBS/pyg/'), 'heu_' + config)[0]
     output = [cost]
 
-    for itr in range(1, 301):
+    total_time = 0
+    while True:
         if ran:
+            algo_start = time.time()
             next_schedule, next_cost = random_LNS(map_data, schedule, sample_per_steps, config)
+            algo_end = time.time()
+            algo_spend = algo_end - algo_start
+            total_time += algo_spend
         else:
+            algo_start = time.time()
             next_schedule, next_cost = LNS(map_data, schedule, sample_per_steps, config)
+            algo_end = time.time()
+            algo_spend = algo_end - algo_start
+            total_time += algo_spend
 
         if cost > next_cost:
             schedule = next_schedule
             cost = next_cost
         else:
             pass
-        output.append(cost)
 
-    return output
+        if total_time >= time_list[0]:
+            output.append(cost)
+            time_list.pop(0)
+
+            if len(time_list) == 0:
+                return output
 
 
 if __name__ == '__main__':
     seed_everything()
-    mode = 'exp'
-    # mode = 'plot'
 
-    data_config = '88_5_20'
+    # mode = 'exp'
+    # mode = 'plot'
+    mode = 'test_pred'
+
     cuda = 'cuda:3'
+
+    obs_density = ['sparse', 'medium', 'dense']
+    map_config = ['88_5_15', '88_5_20', '88_5_25', '88_5_30']
+    # map_config = ['1616_5_15', '1616_5_20', '1616_5_25', '1616_5_30']
+    # map_config = ['88_5_5', '88_10_10', '88_15_15']
 
     if mode == 'exp':
         from tqdm import tqdm
 
-        datadir = torch.load('data/{}.pt'.format(data_config), map_location=torch.device('cpu'))
-        map_id = random.sample(range(10000), 100)
+        for od in obs_density:
+            for mc in map_config:
 
-        nn_res, heu_res, r_res = [], [], []
+                datadir = torch.load('data/{}/{}.pt'.format(od, mc))
+                map_id = random.sample(range(10000), 5)
 
-        for m_id in tqdm(map_id):
-            # nn = run_nn(data=datadir[m_id], device=cuda, config=data_config)
-            # nn_res.append(nn)
-            heu = run_heu(data=datadir[m_id], config=data_config)
-            heu_res.append(heu)
-            # r = run_heu(data=datadir[m_id], ran=True, config=data_config)
-            # r_res.append(r)
+                nn_res, heu_res, r_res = [], [], []
 
-        # with open('nn_' + data_config, 'wb') as fp:
-        #     pickle.dump(nn_res, fp)
-        with open('heu_' + data_config, 'wb') as fp:
-            pickle.dump(heu_res, fp)
-        # with open('r_' + data_config, 'wb') as fp:
-        #     pickle.dump(r_res, fp)
+                for m_id in tqdm(map_id):
+                    nn = run_nn(data=datadir[m_id], device=cuda, config=od + '_' + mc)
+                    nn_res.append(nn)
+                    heu = run_heu(data=datadir[m_id], config=od + '_' + mc)
+                    heu_res.append(heu)
+                    r = run_heu(data=datadir[m_id], ran=True, config=od + '_' + mc)
+                    r_res.append(r)
+
+                with open('result/nn' + '_' + od + '_' + mc, 'wb') as fp:
+                    pickle.dump(nn_res, fp)
+                with open('result/heu' + '_' + od + '_' + mc, 'wb') as fp:
+                    pickle.dump(heu_res, fp)
+                with open('result/r' + '_' + od + '_' + mc, 'wb') as fp:
+                    pickle.dump(r_res, fp)
 
     elif mode == 'plot':
-        with open('nn_' + data_config, 'rb') as fp:
-            nn = pickle.load(fp)
-        with open('heu_' + data_config, 'rb') as fp:
-            heu = pickle.load(fp)
-        with open('r_' + data_config, 'rb') as fp:
-            r = pickle.load(fp)
+        for od in obs_density:
+            for mc in map_config:
+                with open('result/nn' + '_' + od + '_' + mc, 'rb') as fp:
+                    nn = pickle.load(fp)
+                with open('result/heu' + '_' + od + '_' + mc, 'rb') as fp:
+                    heu = pickle.load(fp)
+                with open('result/r' + '_' + od + '_' + mc, 'rb') as fp:
+                    r = pickle.load(fp)
 
-        nn_sig = np.array(nn).mean(0) + np.array(nn).std(0) * .2, np.array(nn).mean(0) - np.array(nn).std(0) * .2
-        heu_sig = np.array(heu).mean(0) + np.array(heu).std(0) * .2, np.array(heu).mean(0) - np.array(heu).std(0) * .2
-        r_sig = np.array(r).mean(0) + np.array(r).std(0) * .2, np.array(r).mean(0) - np.array(r).std(0) * .2
+                nn_sig = np.array(nn).mean(0) + np.array(nn).std(0) * .2, np.array(nn).mean(0) - np.array(nn).std(
+                    0) * .2
+                heu_sig = np.array(heu).mean(0) + np.array(heu).std(0) * .2, np.array(heu).mean(0) - np.array(heu).std(
+                    0) * .2
+                r_sig = np.array(r).mean(0) + np.array(r).std(0) * .2, np.array(r).mean(0) - np.array(r).std(0) * .2
 
-        init_cost = np.array(nn).mean(0)[0]
+                init_cost = np.array(nn).mean(0)[0]
 
+                plt.clf()
+                plt.plot(range(0, 121, 3), np.array(nn).mean(0), 'r-', label='NN')
+                plt.plot(range(0, 121, 3), np.array(heu).mean(0), 'b-', label='Heuristic')
+                plt.plot(range(0, 121, 3), np.array(r).mean(0), 'g-', label='Random')
+                plt.fill_between(range(0, 121, 3), nn_sig[0], nn_sig[1], color='lightcoral', alpha=.5)
+                plt.fill_between(range(0, 121, 3), heu_sig[0], heu_sig[1], color='lightskyblue', alpha=.5)
+                plt.fill_between(range(0, 121, 3), r_sig[0], r_sig[1], color='limegreen', alpha=.5)
+                plt.legend()
+                plt.xlabel('Computation Time(s)')
+                plt.ylabel('Schedule Cost')
+                plt.title(od + '_' + mc)
+                plt.show()
+
+    else:
         plt.clf()
-        plt.plot(range(0, 301), np.array(nn).mean(0), 'r-', label='NN')
-        plt.plot(range(0, 301), np.array(heu).mean(0), 'b-', label='Heuristic')
-        plt.plot(range(0, 301), np.array(r).mean(0), 'g-', label='Random')
-        plt.axhline(init_cost * 2 / 3, color='lightgrey', linestyle='--')
-        plt.axhline(init_cost * 1 / 2, color='lightgrey', linestyle='--')
-        plt.fill_between(range(0, 301), nn_sig[0], nn_sig[1], color='lightcoral', alpha=.5)
-        plt.fill_between(range(0, 301), heu_sig[0], heu_sig[1], color='lightskyblue', alpha=.5)
-        plt.fill_between(range(0, 301), r_sig[0], r_sig[1], color='limegreen', alpha=.5)
-        plt.legend()
-        plt.xlabel('Iteration Step')
-        plt.ylabel('Schedule Cost')
-        plt.title(data_config)
+        plot_idx = 0
+        for od in obs_density:
+            for mc in map_config:
+                plot_idx += 1
+                plt.subplot(len(obs_density), len(map_config), plot_idx)
+                x, y = test_pred(od, mc, cuda, single=False)
+                plt.plot(x, y, 'b.', alpha=.5)
+                plt.xlabel('preds')
+                plt.ylabel('labels')
+                plt.title('{}_{}'.format(od, mc))
+        plt.tight_layout()
         plt.show()

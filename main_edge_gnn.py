@@ -17,36 +17,35 @@ from src.model.rt import RelationalTransformer
 from utils.seed import seed_everything
 
 
-def generate_pathgnn_data():
-    seed_everything(seed=42)
-    for data_type in ['test']:
-        scenarios = torch.load('data/32_single/{}.pt'.format(data_type))
+def generate_pathgnn_data(od, mc):
+    seed_everything()
+    scenarios = torch.load('data/single/{}_{}.pt'.format(od, mc))
 
-        save_dir = 'data/32_single/'
-        if not os.path.exists(save_dir):
-            os.makedirs(save_dir)
+    save_dir = 'data/single/'
+    if not os.path.exists(save_dir):
+        os.makedirs(save_dir)
 
-        # standardize label data
-        label = np.array([scen[-1] for scen in scenarios])
-        label = (label - label.mean()) / (label.std() + 1e-5)
+    # standardize label data
+    label = np.array([scen[-1] for scen in scenarios])
+    label = (label - label.mean()) / (label.std() + 1e-5)
 
-        data_list = []
-        for scen, y in zip(tqdm(scenarios), label):
-            coords, types, edge_index, schedule, _ = scen
+    data_list = []
+    for scen, y in zip(tqdm(scenarios), label):
+        coords, types, edge_index, schedule, _ = scen
 
-            nf_coord = torch.Tensor(coords)
-            nf_coord = (nf_coord - nf_coord.min()) / (nf_coord.max() + nf_coord.min())
-            nf_type = torch.eye(4)[types]
-            nf = torch.cat((nf_coord, nf_type), -1)
+        nf_coord = torch.Tensor(coords)
+        nf_coord = (nf_coord - nf_coord.min()) / (nf_coord.max() + nf_coord.min())
+        nf_type = torch.eye(4)[types]
+        nf = torch.cat((nf_coord, nf_type), -1)
 
-            edge_index = torch.LongTensor(edge_index).transpose(-1, 0)
+        edge_index = torch.LongTensor(edge_index).transpose(-1, 0)
 
-            data = Data(x=nf, edge_index=edge_index, edge_attr=torch.ones(edge_index.shape[-1], 1),
-                        schedule=torch.LongTensor(schedule), y=torch.Tensor([y]))
+        data = Data(x=nf, edge_index=edge_index, edge_attr=torch.ones(edge_index.shape[-1], 1),
+                    schedule=torch.LongTensor(schedule), y=torch.Tensor([y]))
 
-            data_list.append(data)
+        data_list.append(data)
 
-        torch.save(data_list, save_dir + '{}.pt'.format(data_type))
+    torch.save(data_list, save_dir + '{}_{}.pt'.format(od, mc))
 
 
 def gnn_train(device: str, logging: bool, type: str):
@@ -110,10 +109,10 @@ def gnn_train(device: str, logging: bool, type: str):
                 wandb.log({'val_loss': val_loss})
 
 
-def gnn_test(device: str):
-    seed_everything(seed=43)
+def gnn_test(od, mc, device: str):
+    seed_everything()
     config = OmegaConf.load('config/experiment/rt.yaml')
-    test_data = torch.load('data/32_single/test.pt', map_location=device)
+    test_data = torch.load('data/single/{}_{}.pt'.format(od, mc), map_location=device)
     test_loader = DataLoader(test_data, batch_size=10, shuffle=True)
 
     gnn = RelationalTransformer(config).to(device)
@@ -127,16 +126,19 @@ def gnn_test(device: str):
         labels.extend(test.y.cpu().detach())
 
     plt.clf()
-    plt.plot(preds, labels, 'b.')
+    plt.plot(preds, labels, 'b.', alpha=.5)
     criterion = range(math.floor(min(preds + labels)), math.ceil(max(preds + labels)))
     plt.plot(criterion, criterion, 'r--')
     plt.xlabel('preds')
     plt.ylabel('labels')
-    plt.title('rt_{}layers'.format(config.model.num_layers))
-    plt.show()
+    plt.title('{}_{}'.format(od, mc))
+    plt.savefig('fig/{}_{}'.format(od, mc))
 
 
 if __name__ == '__main__':
-    # generate_pathgnn_data()
-    # gnn_train(device='cuda:0', logging=True, type='rt')
-    gnn_test(device='cuda:3')
+    obs_density = ['sparse', 'medium', 'dense']
+    map_config = ['88_5_5', '88_10_10', '88_15_15']
+    for od in obs_density:
+        for mc in map_config:
+            gnn_test(od, mc, 'cuda:3')
+            # generate_pathgnn_data(od, mc)

@@ -153,7 +153,7 @@ def sch_to_dgl(assign_idx, coord_schedule, size):
     return graph
 
 
-def partition_8():
+def special_case():
     obs = [(0, 3), (1, 3), (2, 3),
            (4, 0), (4, 1), (4, 2),
            (5, 4), (6, 4), (7, 4),

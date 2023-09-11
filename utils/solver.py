@@ -2,6 +2,7 @@ import copy
 import os
 import shutil
 import subprocess
+import time
 from pathlib import Path
 
 import numpy as np
@@ -97,6 +98,7 @@ def solver(map, agents, tasks, save_dir, exp_name, ret_log=False):
     seq_paths = [[list(agents[a])] for a in range(len(agents))]
     total_cost, itr, T = 0, 0, 0
 
+    s = time.time()
     while sum([len(t) for t in todo]) != 0:
         itr += 1
         s_tasks = list()
@@ -105,34 +107,34 @@ def solver(map, agents, tasks, save_dir, exp_name, ret_log=False):
                 s_tasks.append([list(a)])
             else:
                 s_tasks.append([t[0]])
-        save_map(map, exp_name, save_dir)
-        save_scenario(s_agents, s_tasks, exp_name, map.shape[0], map.shape[1], save_dir)
+        save_map(map, exp_name, save_dir + exp_name + '/')
+        save_scenario(s_agents, s_tasks, exp_name, map.shape[0], map.shape[1], save_dir + exp_name + '/')
 
-        c = ['PBS/pbs',
+        c = [os.path.join(Path(os.path.realpath(__file__)).parent.parent, 'PBS/pbs'),
              "-m",
-             save_dir + exp_name + '.map',
+             save_dir + exp_name + '/' + '{}.map'.format(exp_name),
              "-a",
-             save_dir + exp_name + '.scen',
+             save_dir + exp_name + '/' + '{}.scen'.format(exp_name),
              "-o",
-             save_dir + exp_name + ".csv",
+             save_dir + exp_name + '/' + '{}.csv'.format(exp_name),
              "--outputPaths",
-             save_dir + exp_name + "_paths_{}.txt".format(itr),
+             save_dir + exp_name + '/' + '{}_paths_{}.txt'.format(exp_name, itr),
              "-k", "{}".format(len(s_agents)),
-             "-t", "{}".format(1),
-             ]
+             "-t", "{}".format(1)]
+
         process_out = subprocess.run(c, capture_output=True)
         text_byte = process_out.stdout.decode('utf-8')
 
         if (text_byte[37:44] != 'Succeed') & ret_log:
-            if os.path.exists(save_dir + exp_name):
-                shutil.rmtree(save_dir + exp_name)
-            return 'error', 'error', 'error'
+            if os.path.exists(save_dir + exp_name + '/'):
+                shutil.rmtree(save_dir + exp_name + '/')
+            return 'retry', 'retry', 'retry'
         elif text_byte[37:44] != 'Succeed':
-            if os.path.exists(save_dir + exp_name):
-                shutil.rmtree(save_dir + exp_name)
-            return 'error', 'error'
+            if os.path.exists(save_dir + exp_name + '/'):
+                shutil.rmtree(save_dir + exp_name + '/')
+            return 'retry', 'retry'
 
-        traj = read_trajectory(save_dir + exp_name + "_paths_{}.txt".format(itr))
+        traj = read_trajectory(save_dir + exp_name + '/{}_paths_{}.txt'.format(exp_name, itr))
         len_traj = [len(t) - 1 for t in traj]
         d_len_traj = [l for l in len_traj if l not in {0}]
         next_t = np.min(d_len_traj)
@@ -164,8 +166,12 @@ def solver(map, agents, tasks, save_dir, exp_name, ret_log=False):
 
         total_cost += next_t * len(d_len_traj)
 
-    if os.path.exists(save_dir + exp_name):
-        shutil.rmtree(save_dir + exp_name)
+        if (time.time() - s) > 100:
+            break
+
+    if os.path.exists(save_dir + exp_name + '/'):
+        shutil.rmtree(save_dir + exp_name + '/')
+
     if ret_log:
         return total_cost, seq_paths, time_log
     else:
@@ -192,24 +198,23 @@ def id_to_assignment(assign_id, task_coords):
 
 
 def one_step_solver(map, agents, tasks, save_dir, exp_name):
-    if not os.path.exists(save_dir):
-        os.makedirs(save_dir)
+    if not os.path.exists(save_dir + exp_name):
+        os.makedirs(save_dir + exp_name)
 
-    save_map(map, exp_name, save_dir)
-    one_to_one_scen(agents, tasks, exp_name, map.shape[0], map.shape[1], save_dir)
+    save_map(map, exp_name, save_dir + exp_name + '/')
+    one_to_one_scen(agents, tasks, exp_name, map.shape[0], map.shape[1], save_dir + exp_name + '/')
 
     c = [os.path.join(Path(os.path.realpath(__file__)).parent.parent, 'PBS/pbs'),
          "-m",
-         save_dir + exp_name + '.map',
+         save_dir + exp_name + '/' + '{}.map'.format(exp_name),
          "-a",
-         save_dir + exp_name + '.scen',
+         save_dir + exp_name + '/' + '{}.scen'.format(exp_name),
          "-o",
-         save_dir + exp_name + ".csv",
+         save_dir + exp_name + '/' + '{}.csv'.format(exp_name),
          "--outputPaths",
-         save_dir + exp_name + "paths.txt",
+         save_dir + exp_name + '/' + '{}_paths.txt'.format(exp_name),
          "-k", "{}".format(len(agents)),
-         "-t", "{}".format(1),
-         ]
+         "-t", "{}".format(1)]
 
     process_out = subprocess.run(c, capture_output=True)
     if os.path.exists(process_out.args[8]):
@@ -219,7 +224,7 @@ def one_step_solver(map, agents, tasks, save_dir, exp_name):
     else:
         costs = 'retry'
 
-    if os.path.exists(save_dir):
-        shutil.rmtree(save_dir)
+    if os.path.exists(save_dir + exp_name + '/'):
+        shutil.rmtree(save_dir + exp_name + '/')
 
     return costs

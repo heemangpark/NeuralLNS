@@ -1,16 +1,15 @@
 import copy
+import math
 import os
 import random
 import shutil
 import sys
-from datetime import datetime
 
-import networkx as nx
 import numpy as np
 import torch
 from matplotlib import pyplot as plt
 from omegaconf import OmegaConf
-from torch_geometric.data import Data, HeteroData
+from torch_geometric.data import Data
 from torch_geometric.loader import DataLoader
 from tqdm import tqdm, trange
 
@@ -95,167 +94,157 @@ def lns_itr_test(config):
         plt.clf()
 
 
-def pyg_data(scen_config: str, graph_type: str = 'homo'):
+def pyg_data(norm: bool, scen_config: str):
     seed_everything(seed=42)
-    if graph_type == 'homo':
-        for data_type in ['train', 'val', 'test']:
+    for data_type in ['train', 'val', 'test']:
+        scenarios = torch.load('datas/scenarios/test/{}/{}.pt'.format(scen_config, data_type))
 
-            scenarios = torch.load('datas/scenarios/{}/{}.pt'.format(scen_config, data_type))
-            save_dir = 'datas/pyg/{}/'.format(scen_config)
+        if norm:
+            data_list = []
+
+            norm_dir = 'datas/pyg/norm_test/{}/'.format(scen_config)
+            if not os.path.exists(norm_dir):
+                os.makedirs(norm_dir)
+
+            nf_list, e_id_list, ef_list, y_list = [[] for _ in range(4)]
+            for scen in scenarios:
+                nf_list.append(torch.Tensor(scen[0]))
+                e_id_list.append(torch.LongTensor(scen[1]))
+                ef_list.append(torch.Tensor(scen[2]))
+                y_list.append(scen[3])
+
+            nf = torch.stack(nf_list)
+            e_id = torch.stack(e_id_list)
+            ef = torch.stack(ef_list)
+            ys = torch.Tensor(y_list)
+
+            norm_nf = (nf - nf.mean()) / (nf.std() + 1e-5)
+            norm_ef_0 = (ef[:, :, 0] - ef[:, :, 0].mean()) / (ef[:, :, 0].std() + 1e-5)
+            norm_ef_1 = (ef[:, :, 1] - ef[:, :, 1].mean()) / (ef[:, :, 1].std() + 1e-5)
+            norm_ef_2 = (ef[:, :, 2] - ef[:, :, 2].mean()) / (ef[:, :, 2].std() + 1e-5)
+            norm_ef = torch.stack([norm_ef_0, norm_ef_1, norm_ef_2], dim=-1)
+            norm_y = (ys - ys.mean()) / (ys.std() + 1e-5)
+
+            for x, edge_index, edge_attr, y in zip(tqdm(norm_nf), e_id, norm_ef, norm_y):
+                data_list.append(Data(x=x, edge_index=edge_index, edge_attr=edge_attr, y=y))
+
+            torch.save(data_list, norm_dir + '{}.pt'.format(data_type))
+
+        else:
+            data_list = []
+
+            save_dir = 'datas/pyg/test/{}/'.format(scen_config)
             if not os.path.exists(save_dir):
                 os.makedirs(save_dir)
 
-            data_list = []
             for scen in tqdm(scenarios):
-                grid, graph, a_coord, t_coord, y = scen
-                node_list = a_coord + t_coord
-
-                # node feature
-                x = torch.FloatTensor(node_list) / grid.shape[0]
-
-                # edge index
-                edge_index = []
-                for i in range(len(node_list)):
-                    for j in range(i, len(node_list)):
-                        if i == j:
-                            pass
-                        else:
-                            edge_index.append([i, j])
-
-                # edge features
-                A, M, O = [], [], []
-                for i, j in edge_index:
-                    astar = nx.astar_path_length(graph, tuple(node_list[i]), tuple(node_list[j])) / grid.shape[0]
-                    manhattan = sum(abs(np.array(node_list[i]) - np.array(node_list[j]))) / grid.shape[0]
-                    obstacle = (astar - manhattan) / grid.shape[0]
-                    A.append(astar)
-                    M.append(manhattan)
-                    O.append(obstacle)
-
-                edge_attr = torch.cat((torch.FloatTensor(A).view(-1, 1),
-                                       torch.FloatTensor(M).view(-1, 1),
-                                       torch.FloatTensor(O).view(-1, 1)), dim=-1)
-
-                edge_index = torch.LongTensor(edge_index).transpose(-1, 0)
-
-                # label data
-                y = torch.FloatTensor(y)
-
+                nf, edge_index, edge_attr, y = scen
+                x = torch.FloatTensor(nf)
+                edge_attr = torch.Tensor(edge_attr)
+                edge_index = torch.LongTensor(edge_index)
+                y = torch.Tensor(y)
                 data_list.append(Data(x=x, edge_index=edge_index, edge_attr=edge_attr, y=y))
 
             torch.save(data_list, save_dir + '{}.pt'.format(data_type))
 
-    elif graph_type == 'hetero':
-        for data_type in ['train', 'val', 'test']:
 
-            data_list = []
-            scenarios = torch.load('datas/scenarios/{}/{}.pt'.format(scen_config, data_type))
-
-            for scen in tqdm(scenarios):
-                grid, graph, a_coord, t_coord, y = scen
-
-                src, dst = [], []
-                for a_id in range(len(a_coord)):
-                    for t_id in range(len(a_coord), len(a_coord) + len(t_coord)):
-                        src.extend([a_id, t_id])
-                        dst.extend([t_id, a_id])
-                edge_index = torch.LongTensor([src, dst])
-
-                A, M, P = [], [], []
-                for _a in a_coord:
-                    for _t in t_coord:
-                        astar = nx.astar_path_length(graph, tuple(_a), tuple(_t)) / grid.shape[0]
-                        man = sum(abs(np.array(_a) - np.array(_t))) / grid.shape[0]
-                        proxy = astar - man
-                        A.extend([astar] * 2)
-                        M.extend([man] * 2)
-                        P.extend([proxy] * 2)
-
-                data = HeteroData()
-                data['agent'].x = torch.FloatTensor(a_coord) / grid.shape[0]
-                data['task'].x = torch.FloatTensor(t_coord) / grid.shape[0]
-
-                data['agent', 'astar', 'task'].edge_index = edge_index
-                data['agent', 'astar', 'task'].edge_attr = torch.FloatTensor(A).view(-1, 1)
-                data['agent', 'astar', 'task'].y = torch.Tensor(y)
-
-                data['task', 'astar', 'agent'].edge_index = edge_index
-                data['task', 'astar', 'agent'].edge_attr = torch.FloatTensor(A).view(-1, 1)
-                data['task', 'astar', 'agent'].y = torch.Tensor(y)
-
-                data['agent', 'man', 'task'].edge_index = edge_index
-                data['agent', 'man', 'task'].edge_attr = torch.FloatTensor(M).view(-1, 1)
-                data['agent', 'man', 'task'].y = torch.Tensor(y)
-
-                data['task', 'man', 'agent'].edge_index = edge_index
-                data['task', 'man', 'agent'].edge_attr = torch.FloatTensor(M).view(-1, 1)
-                data['task', 'man', 'agent'].y = torch.Tensor(y)
-
-                data['agent', 'proxy', 'task'].edge_index = edge_index
-                data['agent', 'proxy', 'task'].edge_attr = torch.FloatTensor(P).view(-1, 1)
-                data['agent', 'proxy', 'task'].y = torch.Tensor(y)
-
-                data['task', 'proxy', 'agent'].edge_index = edge_index
-                data['task', 'proxy', 'agent'].edge_attr = torch.FloatTensor(P).view(-1, 1)
-                data['task', 'proxy', 'agent'].y = torch.Tensor(y)
-
-                data_list.append(data)
-            torch.save(data_list, 'datas/pyg/{}/{}/hetero.pt'.format(scen_config, data_type))
-
-    else:
-        raise ValueError('supports only homogeneous and heterogeneous graphs')
-
-
-def run(device: str, edge_type: str, logging: bool = False):
+def run(device: str, logging: bool, num_layer: int):
     seed_everything(seed=42)
-    configs = OmegaConf.load('config/experiment/edge_test.yaml')
+    config = OmegaConf.load('config/experiment/edge_test.yaml')
 
-    date = datetime.now().strftime("%m%d_%H%M%S")
-    model_dir = 'datas/models/{}_edge_test/'.format(date)
-    if not os.path.exists(model_dir):
-        os.makedirs(model_dir)
+    if logging:
+        # date = datetime.now().strftime("%m%d_%H%M%S")
+        model_dir = 'datas/models/norm_NL_{}_HS_F/'.format(num_layer)
+        if not os.path.exists(model_dir):
+            os.makedirs(model_dir)
 
-    train_data = torch.load('datas/pyg/{}/train.pt'.format(configs.map), map_location=device)
-    train_loader = DataLoader(train_data, batch_size=configs.batch_size, shuffle=True)
-    val_data = torch.load('datas/pyg/{}/val.pt'.format(configs.map), map_location=device)
-    val_loader = DataLoader(val_data, batch_size=configs.batch_size, shuffle=True)
+    train_data = torch.load('datas/pyg/norm_test/{}/train.pt'.format(config.map), map_location=device)
+    train_loader = DataLoader(train_data, batch_size=config.batch_size, shuffle=True)
+    val_data = torch.load('datas/pyg/norm_test/{}/val.pt'.format(config.map), map_location=device)
+    val_loader = DataLoader(val_data, batch_size=config.batch_size, shuffle=True)
 
     if logging:
         import wandb
-        wandb.init(project='NeuralLNS', name='{}_{}'.format(edge_type, date))
+        wandb.init(project='NeuralLNS', name='norm_NL_{}_HS_F'.format(num_layer))
 
-    GNN = MPNN(configs, edge_type).to(device)
+    GNN = MPNN(config, num_layer).to(device)
 
     for e in trange(100):
-        train_loss, num_batch = 0, 0
-
+        train_loss = 0
         for train in train_loader:
-            batch_loss = GNN(train, edge_type)
-            train_loss += batch_loss
-            num_batch += 1
-        train_loss /= num_batch
+            batch_loss = GNN(train, config)
+            train_loss += batch_loss / len(train_loader)
 
         if logging:
             wandb.log({'train_loss': train_loss})
 
         if (e + 1) % 10 == 0:
-            torch.save(GNN.state_dict(), model_dir + '{}_{}.pt'.format(edge_type, e + 1))
-            val_GNN = MPNN(configs, edge_type).to(device)
-            val_GNN.load_state_dict(torch.load(model_dir + '{}_{}.pt'.format(edge_type, e + 1)))
+            torch.save(GNN.state_dict(), model_dir + '{}.pt'.format(e + 1))
+            val_GNN = MPNN(config, num_layer).to(device)
+            val_GNN.load_state_dict(torch.load(model_dir + '{}.pt'.format(e + 1)))
             val_GNN.eval()
 
-            val_loss, num_batch = 0, 0
+            val_loss = 0
             for val in val_loader:
-                batch_loss = val_GNN(val, edge_type)
-                val_loss += batch_loss
-                num_batch += 1
-            val_loss /= num_batch
+                batch_loss = val_GNN(val, config)
+                val_loss += batch_loss / len(val_loader)
 
             if logging:
                 wandb.log({'val_loss': val_loss})
 
 
+def test(device: str, model_dir: str, num_layer: int, title: str):
+    seed_everything(seed=44)
+    config = OmegaConf.load('config/experiment/edge_test.yaml')
+    test_data = torch.load('datas/pyg/norm_test/{}/test.pt'.format(config.map), map_location=device)
+    test_loader = DataLoader(test_data, shuffle=True)
+
+    GNN = MPNN(config, num_layer).to(device)
+    GNN.load_state_dict(torch.load('datas/models/' + model_dir))
+    GNN.eval()
+
+    preds, labels = [], []
+    for test in tqdm(test_loader):
+        preds.append(GNN(test, config, test=True).item())
+        labels.append(test.y.item())
+
+    plt.clf()
+    plt.plot(preds, labels, 'b.')
+    criterion = range(math.floor(min(preds + labels)), math.ceil(max(preds + labels)))
+    plt.plot(criterion, criterion, 'r--')
+    plt.xlabel('preds')
+    plt.ylabel('labels')
+    plt.title(title)
+    plt.show()
+
+
+def layer_test(device: str, model_dir: str):
+    import torch.nn as nn
+    seed_everything(seed=43)
+    lin = nn.Linear(32, 2, bias=False)
+    lin.weight = nn.Parameter(torch.randn(2, 32), requires_grad=False)
+    lin.to(device)
+
+    config = OmegaConf.load('config/experiment/edge_test.yaml')
+    test_data = torch.load('datas/pyg/test/{}/test.pt'.format(config.map), map_location=device)
+
+    GNN = MPNN(config).to(device)
+    GNN.load_state_dict(torch.load('datas/models/' + model_dir))
+    GNN.eval()
+
+    layer_h = GNN(test_data[0], config, test=True)
+    for id, h in enumerate([lin(h) for h in layer_h]):
+        hx, hy = h[:, 0].cpu().detach().numpy(), h[:, 1].cpu().detach().numpy()
+        plt.clf()
+        plt.plot(hx, hy, 'b.')
+        plt.title("layer_{}".format(id))
+        plt.show()
+
+
 if __name__ == '__main__':
-    # pyg_data('16_16_20_20_20')
-    # pyg_data('16_16_partition_20_20')
-    run(device='cuda:3', edge_type='AMP', logging=False)
+    # pyg_data(norm=True, scen_config='8_8_20_5_5')
+    # run(device='cuda:0', logging=True, num_layer=1)
+    NL = 1
+    test(device='cuda:0', model_dir='norm_NL_{}_HS_F/100.pt'.format(NL), num_layer=NL,
+         title='norm_NL_{}_HS_F'.format(NL))
+    # layer_test(device='cuda:1', model_dir='NL_8_GIN/100.pt')

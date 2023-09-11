@@ -5,7 +5,7 @@ import torch
 import torch.backends.cudnn as cudnn
 
 
-def seed_everything(seed):
+def seed_everything(seed: int = 42):
     torch.manual_seed(seed)
     torch.cuda.manual_seed(seed)
     torch.cuda.manual_seed_all(seed)

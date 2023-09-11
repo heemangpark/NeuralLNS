@@ -1,4 +1,5 @@
 from math import sqrt
+from typing import Any
 
 import torch
 import torch.nn as nn
@@ -6,6 +7,7 @@ from einops import repeat, rearrange
 from lion_pytorch import Lion
 from torch_geometric.data import Batch
 from torch_geometric.nn import MessagePassing
+from torch_geometric.nn.models import MLP
 
 
 def path_aggr(t1, t2, mode: str):
@@ -29,7 +31,7 @@ class MOMDInitEmbedding(nn.Module):
         self.node_emb = nn.Linear(node_dim, embed_dim)
         self.edge_emb = nn.Linear(edge_dim, embed_dim)
 
-    def forward(self, batch: Batch) -> torch.Tensor:
+    def forward(self, batch: Batch) -> tuple[Any, Any]:
         nf, ef = batch.x, batch.edge_attr
         node_emb = self.node_emb(nf)
         edge_emb = self.edge_emb(ef)
@@ -157,7 +159,7 @@ class PathInit(nn.Module):
 
 
 class PathGNN(nn.Module):
-    def __init__(self, config):
+    def __init__(self, config, readout_dir: int, readout_type: str):
         super().__init__()
         self.init_emb = MOMDInitEmbedding(config.model.n_enc_dim, config.model.e_enc_dim, config.model.model_dim)
         self.path_init = PathInit(config.model.model_dim, config.model.model_dim)
@@ -173,10 +175,15 @@ class PathGNN(nn.Module):
 
         self.dec = nn.Linear(config.model.model_dim, config.model.e_enc_dim)
 
+        self.readout_dir = readout_dir
+        self.readout_type = readout_type
+        if self.readout_type == 'mlp':
+            self.mlp = MLP([5, 2, 2, 1])
+
         self.loss = getattr(nn, config.model.loss)()
         self.optimizer = Lion(self.parameters(), lr=config.model.optimizer.lr, weight_decay=config.model.optimizer.wd)
 
-    def forward(self, batch: Batch) -> torch.Tensor:
+    def forward(self, batch: Batch, test: bool = False) -> torch.Tensor:
         nf, ef = self.init_emb(batch)
         n = batch.batch.shape[0] // len(batch)
         pf = self.path_init(batch.batch, len(batch), n, batch.edge_index, ef)
@@ -184,18 +191,38 @@ class PathGNN(nn.Module):
         for path_conv in self.path_convs:
             nf, pf = path_conv(nf, pf, batch.edge_index)
 
-        pred = self.dec(pf).squeeze(-1)
+        feat = self.dec(pf).squeeze(-1)
         sch = rearrange(batch.schedule, '(N C) L -> N C L', N=len(batch))
 
-        h = []
-        for p, s in zip(pred, sch):
-            h.append([p[_s[0], _s[1]] for _s in s])
-        y_hat = torch.cat([torch.stack(_h) for _h in h]).view(-1, 1)
+        sch_pf = []
+        if self.readout_dir == 1:  # A -> T
+            for p, s in zip(feat, sch):
+                sch_pf_per_batch = torch.stack([p[tuple(_s)] for _s in s])
+                sch_pf.append(sch_pf_per_batch)  # batch x num_sch
+        elif self.readout_dir == 2:  # A <-> T
+            for p, s in zip(feat, sch):
+                rev_s = torch.stack((s[:, 1], s[:, 0]), dim=-1)
+                batch_sch_pf = torch.stack([p[tuple(_s)] for _s in s])
+                batch_rev_sch_pf = torch.stack([p[tuple(_s)] for _s in rev_s])
+                sch_pf.append(torch.stack((batch_sch_pf, batch_rev_sch_pf), dim=-1))  # batch x num_sch x 2
+                # TODO: pre-readout not implemented yet
 
-        loss = self.loss(y_hat, batch.y)
-        loss.backward()
+        final_pf = torch.stack(sch_pf)
+        if (self.readout_type == 'sum') or (self.readout_type == 'mean'):
+            y_hat = getattr(torch, self.readout_type)(final_pf, dim=-1)
+        elif (self.readout_type == 'max') or (self.readout_type == 'min'):
+            y_hat = getattr(torch, self.readout_type)(final_pf, dim=-1)[0]
+        else:
+            y_hat = self.mlp(final_pf).squeeze(-1)
 
-        self.optimizer.step()
-        self.optimizer.zero_grad()
+        if test:
+            return y_hat
 
-        return loss.item()
+        else:
+            loss = self.loss(y_hat, batch.y)
+            loss.backward()
+            nn.utils.clip_grad_norm_(self.parameters(), 1.0)
+            self.optimizer.step()
+            self.optimizer.zero_grad()
+
+            return loss.item()
